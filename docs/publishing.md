@@ -5,8 +5,8 @@
 Do not publish before the DynoTable release that serves the full Editor integration is out. That
 release is the minimum app version.
 
-- `MIN_APP_VERSION` in `src/discovery.ts` is that version, written `X.Y.Z-0`. It is `1.19.0-0`
-  now. Change it if the release has a different version.
+- `MIN_APP_VERSION` in `src/discovery.ts` is that version, written `X.Y.Z`. It is `1.19.0`.
+  Change it if the release has a different version.
 - The README and `CHANGELOG.md` state the same version.
 - [dynotable.com/docs/editors](https://dynotable.com/docs/editors) is live. The README, the
   **Open Documentation** command and the **Open Documentation** action on a DynoTable message link
