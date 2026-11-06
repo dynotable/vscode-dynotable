@@ -9,6 +9,10 @@
     "type": "git",
     "url": "https://github.com/dynotable/vscode-dynotable.git"
   },
+  "bugs": {
+    "url": "https://github.com/dynotable/vscode-dynotable/issues"
+  },
+  "homepage": "https://dynotable.com/docs/editors",
   "packageManager": "pnpm@12.18.0",
   "devEngines": {
     "runtime": {
