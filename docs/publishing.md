@@ -86,6 +86,6 @@ repo.
 
 - Add the listing icon (`icon` in `package.json`) and one screenshot: a SQL JOIN across a table and
   an index, with the results panel and the explorer visible.
-- Remove `docs/plans/`, or scrub it so that it describes only the wire protocol and this repo.
-- Squash the whole history, branch commits included, before the repo becomes public.
+- Make sure no commit from before the history squash is still reachable on GitHub. Ask GitHub
+  Support to purge unreachable commits, or publish from a new repository.
 - Check Windows and Linux on real machines before the listing claims them.
