@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "singleQuote": true,
+  "bracketSpacing": false,
+  "printWidth": 100,
+  "trailingComma": "none",
+  "tabWidth": 2,
+  "semi": true,
+  "sortPackageJson": false,
+  "ignorePatterns": ["dist", "out", "pnpm-lock.yaml", "*.vsix", "docs/plans", "contract"]
+}

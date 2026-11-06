@@ -1,0 +1,217 @@
+{
+  "name": "vscode-dynotable",
+  "displayName": "DynoTable",
+  "description": "SQL, PartiQL and OpenSearch queries for DynamoDB and OpenSearch, served by the DynoTable desktop app.",
+  "version": "0.1.0",
+  "publisher": "dynotable",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dynotable/vscode-dynotable.git"
+  },
+  "packageManager": "pnpm@12.18.0",
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": ">=26"
+    }
+  },
+  "engines": {
+    "vscode": "^1.91.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "extensionKind": [
+    "ui"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false
+    }
+  },
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onLanguage:sql",
+    "onLanguage:partiql",
+    "onLanguage:opensearch",
+    "onView:dynotable.explorer"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "partiql",
+        "aliases": [
+          "PartiQL"
+        ],
+        "extensions": [
+          ".partiql"
+        ]
+      },
+      {
+        "id": "opensearch",
+        "aliases": [
+          "OpenSearch"
+        ],
+        "extensions": [
+          ".opensearch"
+        ]
+      }
+    ],
+    "grammars": [
+      {
+        "language": "partiql",
+        "scopeName": "source.partiql",
+        "path": "./syntaxes/partiql.tmLanguage.json"
+      },
+      {
+        "language": "opensearch",
+        "scopeName": "source.opensearch",
+        "path": "./syntaxes/opensearch.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "DynoTable",
+      "properties": {
+        "dynotable.sqlFiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/*.dynotable.sql"
+          ],
+          "scope": "resource",
+          "markdownDescription": "Glob patterns of `.sql` files that DynoTable serves. Other `.sql` files get nothing."
+        },
+        "dynotable.userDataDir": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "The DynoTable user data directory. Set it only when the app runs with a custom one. When it is set, the extension does not start the app."
+        },
+        "dynotable.appPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "The path of the DynoTable app. Leave it empty to use the standard install location."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "dynotable.run",
+        "title": "Run",
+        "category": "DynoTable",
+        "icon": "$(play)"
+      },
+      {
+        "command": "dynotable.newQuery",
+        "title": "New Query",
+        "category": "DynoTable",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "dynotable.attachSqlFile",
+        "title": "Attach SQL File",
+        "category": "DynoTable"
+      },
+      {
+        "command": "dynotable.pickIndex",
+        "title": "Pick Index",
+        "category": "DynoTable"
+      },
+      {
+        "command": "dynotable.selectProfile",
+        "title": "Select Profile",
+        "category": "DynoTable"
+      },
+      {
+        "command": "dynotable.reconnect",
+        "title": "Reconnect",
+        "category": "DynoTable"
+      },
+      {
+        "command": "dynotable.openDocs",
+        "title": "Open Documentation",
+        "category": "DynoTable"
+      },
+      {
+        "command": "dynotable.refreshExplorer",
+        "title": "Refresh",
+        "category": "DynoTable",
+        "icon": "$(refresh)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "dynotable",
+          "title": "DynoTable",
+          "icon": "media/dynotable.svg"
+        }
+      ]
+    },
+    "views": {
+      "dynotable": [
+        {
+          "id": "dynotable.explorer",
+          "name": "Explorer"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "dynotable.refreshExplorer",
+          "when": "view == dynotable.explorer",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "dynotable.newQuery",
+          "when": "view == dynotable.explorer && viewItem =~ /^(table|index)$/",
+          "group": "inline"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "vscode:prepublish": "node esbuild.mjs --production",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p media",
+    "lint": "oxlint && oxfmt --check",
+    "format": "oxfmt",
+    "test": "vitest run",
+    "build:tests": "node esbuild.mjs --tests",
+    "test:integration": "pnpm build && pnpm build:tests && sh scripts/integration-container.sh",
+    "test:integration:host": "pnpm build && pnpm build:tests && node out/src/test-integration/run.js",
+    "test:live": "pnpm build && pnpm build:tests && node out/src/test-integration/run.js --live",
+    "test:live:coordinated": "pnpm build && pnpm build:tests && node out/src/test-integration/run.js --coordinated",
+    "test:live:launcher": "pnpm build && pnpm build:tests && node out/src/test-integration/run.js --launcher",
+    "contract:record": "pnpm build:tests && node out/scripts/contract-record.js record",
+    "contract:check": "pnpm build:tests && node out/scripts/contract-record.js check",
+    "package": "vsce package --no-dependencies",
+    "gate": "pnpm typecheck && pnpm lint && pnpm test && pnpm test:integration && pnpm package"
+  },
+  "dependencies": {
+    "semver": "^7.8.5",
+    "vscode-languageclient": "11.0.0"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^26.6.6",
+    "@types/semver": "^7.8.0",
+    "@types/vscode": "1.91.0",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.1.0",
+    "esbuild": "^0.28.2",
+    "jsdom": "^30.1.3",
+    "mocha": "^11.8.0",
+    "oxfmt": "^0.76.0",
+    "oxlint": "^1.91.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}
