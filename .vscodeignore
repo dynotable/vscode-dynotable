@@ -1,0 +1,9 @@
+**
+!package.json
+!LICENSE
+!README.md
+!CHANGELOG.md
+!dist/extension.js
+!dist/results.js
+!syntaxes/*.tmLanguage.json
+!media/*.svg
