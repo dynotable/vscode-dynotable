@@ -84,8 +84,8 @@ repo.
 
 ## Before the first publish
 
-- Add the listing icon (`icon` in `package.json`) and one screenshot: a SQL JOIN across a table and
-  an index, with the results panel and the explorer visible.
+- Add one screenshot: a SQL JOIN across a table and an index, with the results panel and the
+  explorer visible.
 - Make sure no commit from before the history squash is still reachable on GitHub. Ask GitHub
   Support to purge unreachable commits, or publish from a new repository.
 - Check Windows and Linux on real machines before the listing claims them.
