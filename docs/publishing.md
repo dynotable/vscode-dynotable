@@ -37,7 +37,8 @@ Steps:
    pnpm contract:record --user-data-dir <dir> --profile <id|slug> --table <table> \
      --large-table <large table> --set-table <table with Sets> --index <index> \
      --sql '<a SELECT that names its columns>' \
-     --projection-sql '<a SELECT that names Set columns of the Set table>'
+     --projection-sql '<a SELECT that names Set columns of the Set table>' \
+     --key-sql '<a SELECT * whose WHERE sets the partition key of the table>'
    ```
 
 2. Run `pnpm gate` on the new fixtures.

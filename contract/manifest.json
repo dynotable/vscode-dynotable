@@ -98,5 +98,9 @@
   "error-cancel-partiql.json": {
     "guard": "responseError",
     "provenance": "recorded"
+  },
+  "run-sql-key.json": {
+    "guard": "runResult",
+    "provenance": "recorded"
   }
 }

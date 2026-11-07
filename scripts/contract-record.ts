@@ -5,7 +5,8 @@
  *
  *   pnpm contract:record --profile <id|slug> --table <name> --large-table <name> --index <name>
  *     --set-table <name> --sql <a SELECT that names its columns>
- *     --projection-sql <a SELECT that names Set columns> [--user-data-dir <dir>]
+ *     --projection-sql <a SELECT that names Set columns>
+ *     --key-sql <a SELECT * whose WHERE bounds the partition key> [--user-data-dir <dir>]
  *   pnpm contract:check  (same options)
  */
 import {readFileSync, writeFileSync} from 'node:fs';
@@ -38,6 +39,8 @@ interface Options {
   sql: string;
   /** Names Set columns, so a projected Set answers the shape of `SELECT *`. */
   projectionSql: string;
+  /** Plans as a Query, so the run takes the server's key-read route, not a Scan. */
+  keySql: string;
   userDataDir: string | undefined;
 }
 
@@ -120,7 +123,7 @@ async function waitFor<T>(read: () => T | undefined, what: string): Promise<T> {
 /** Every answer and refusal the fixtures hold, keyed by fixture file. Unscrubbed. */
 async function capture(file: PortFile, options: Options): Promise<Map<string, unknown>> {
   const out = new Map<string, unknown>();
-  const {table, largeTable, setTable, index, sql, projectionSql} = options;
+  const {table, largeTable, setTable, index, sql, projectionSql, keySql} = options;
 
   const stranger = await open(file.port);
   out.set(
@@ -189,6 +192,10 @@ async function capture(file: PortFile, options: Options): Promise<Map<string, un
   const projectionUri = 'file:///contract/projection.dynotable.sql';
   openDocument(peer, projectionUri, 'sql', projectionSql);
   out.set('run-sql-projection.json', await run(peer, {uri: projectionUri}).response);
+
+  const keyUri = 'file:///contract/key.dynotable.sql';
+  openDocument(peer, keyUri, 'sql', keySql);
+  out.set('run-sql-key.json', await run(peer, {uri: keyUri}).response);
 
   const openSearchUri = 'file:///contract/query.opensearch';
   openDocument(
@@ -386,6 +393,7 @@ async function main(): Promise<void> {
       index: {type: 'string'},
       sql: {type: 'string'},
       'projection-sql': {type: 'string'},
+      'key-sql': {type: 'string'},
       'user-data-dir': {type: 'string'}
     }
   });
@@ -399,6 +407,7 @@ async function main(): Promise<void> {
     index: values.index ?? fail('--index is required'),
     sql: values.sql ?? fail('--sql is required'),
     projectionSql: values['projection-sql'] ?? fail('--projection-sql is required'),
+    keySql: values['key-sql'] ?? fail('--key-sql is required'),
     userDataDir: values['user-data-dir']
   };
   const platform = currentPlatform();
