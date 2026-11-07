@@ -23,6 +23,10 @@
     "guard": "runResult",
     "provenance": "recorded"
   },
+  "run-sql-projection.json": {
+    "guard": "runResult",
+    "provenance": "recorded"
+  },
   "run-opensearch.json": {
     "guard": "runResult",
     "provenance": "recorded"

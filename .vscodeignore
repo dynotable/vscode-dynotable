@@ -7,3 +7,4 @@
 !dist/results.js
 !syntaxes/*.tmLanguage.json
 !media/*.svg
+!media/icon.png

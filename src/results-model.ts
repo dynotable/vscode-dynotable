@@ -67,7 +67,8 @@ export function summary(result: RunResult): string {
 
 /**
  * A column is a literal key, never a path: `o.orderId` is one key. An inherited key such as
- * `toString` is not a value. Exact decimals arrive as text and stay text.
+ * `toString` is not a value. A string shows as it is. Any other value, a tagged one such as
+ * `{"N": …}` or `{"SS": […]}` too, shows as JSON.
  */
 function cellText(row: Record<string, unknown>, column: string): string {
   if (!Object.hasOwn(row, column)) return '';

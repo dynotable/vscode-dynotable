@@ -5,8 +5,8 @@
 Do not publish before the DynoTable release that serves the full Editor integration is out. That
 release is the minimum app version.
 
-- `MIN_APP_VERSION` in `src/discovery.ts` is that version, written `X.Y.Z-0`. It is `1.19.0-0`
-  now. Change it if the release has a different version.
+- `MIN_APP_VERSION` in `src/discovery.ts` is that version, written `X.Y.Z`. It is `1.19.0`.
+  Change it if the release has a different version.
 - The README and `CHANGELOG.md` state the same version.
 - [dynotable.com/docs/editors](https://dynotable.com/docs/editors) is live. The README, the
   **Open Documentation** command and the **Open Documentation** action on a DynoTable message link
@@ -36,7 +36,8 @@ Steps:
    ```sh
    pnpm contract:record --user-data-dir <dir> --profile <id|slug> --table <table> \
      --large-table <large table> --set-table <table with Sets> --index <index> \
-     --sql '<a SELECT that names its columns>'
+     --sql '<a SELECT that names its columns>' \
+     --projection-sql '<a SELECT that names Set columns of the Set table>'
    ```
 
 2. Run `pnpm gate` on the new fixtures.
@@ -84,8 +85,6 @@ repo.
 
 ## Before the first publish
 
-- Add the listing icon (`icon` in `package.json`) and one screenshot: a SQL JOIN across a table and
-  an index, with the results panel and the explorer visible.
 - Make sure no commit from before the history squash is still reachable on GitHub. Ask GitHub
   Support to purge unreachable commits, or publish from a new repository.
 - Check Windows and Linux on real machines before the listing claims them.

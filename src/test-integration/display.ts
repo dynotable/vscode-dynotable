@@ -57,6 +57,12 @@ export function windowsOfPids(pids: number[]): Rect[] {
 const inside = (w: Rect, d: Rect) =>
   w.x >= d.x && w.y >= d.y && w.x + w.width <= d.x + d.width && w.y + w.height <= d.y + d.height;
 
+/** VS Code also shows small helper windows before its main window; they do not show where it opens. */
+const isMain = (w: Rect) => w.width >= 200 && w.height >= 200;
+
+/** A loaded machine can take minutes to show the first window. */
+const WINDOW_WAIT_MS = 300_000;
+
 /**
  * Launches VS Code with its window on the macOS display `name`. VS Code ignores stored window state
  * in an extension test window and opens it on the display under the cursor, so the cursor is put
@@ -76,8 +82,8 @@ export async function onDisplay<T>(
   const launched = launch().finally(() => (settled = true));
   let windows: Rect[] = [];
   try {
-    for (const deadline = Date.now() + 60_000; Date.now() < deadline;) {
-      windows = windowsOf(marker);
+    for (const deadline = Date.now() + WINDOW_WAIT_MS; Date.now() < deadline;) {
+      windows = windowsOf(marker).filter(isMain);
       if (windows.length > 0 || settled) break;
       warp(centre);
       await sleep(50);

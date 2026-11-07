@@ -243,14 +243,26 @@ interface RunResult {
     `<alias>.<attribute>` keys, sorted.
   - For `partiql` and `opensearch`, `columns` is the union of the row keys in first-seen order. A
     row can lack a key.
-- **Values.** A number that JSON cannot hold exactly comes as its exact decimal text (a string).
-  Binary values come as base64 strings, and maps as objects. A `partiql` Set comes as an array; a
-  `sql` Set comes as a one-key object that names its type: `{"SS": [...]}`, `{"NS": [...]}` or
-  `{"BS": [...]}`. In a `sql` `NS`, each number is its decimal text (a string). A Set inside a map
-  has the same form.
+- **Values (`sql` and `partiql`).** Both dialects answer the same shapes:
+  - A string, a boolean and `null` come as JSON values.
+  - When an item does not have an attribute that a `sql` projection names, the cell is `null`. A
+    `SELECT *` row and a `partiql` row do not have the key.
+  - A number comes as a JSON number. A number that JSON cannot hold exactly comes as `{"N": "<exact
+    decimal>"}`.
+  - Binary comes as `{"B": "<base64>"}`.
+  - A Set comes as a one-key object that names its type: `{"SS": [...]}`, `{"NS": [...]}` or
+    `{"BS": [...]}`. Each `NS` member is its decimal text (a string), and each `BS` member is base64.
+    The order of the members is not fixed.
+  - A list comes as an array, and a map as an object. A Set or binary value inside them has the same
+    form.
+  - A string that looks like JSON stays that string.
+  - A projected column (`SELECT tags`, `SELECT (tags)`) answers the same value as `SELECT *`.
+  - Exception: a `sql` statement that the server cannot compile (for example chained joins or window
+    functions) can answer a column whose cells mix strings and structures as JSON text.
+- **Values (`opensearch`).** A row is the hit's `_source`, as stored, plus its `_id`.
 - **Empty.** An empty result can have `columns: []`.
 - **opensearch.** A run with no `range` runs the whole document. A `range` whose text is blank is
-  refused. An `opensearch` row is the hit's `_source` plus its `_id`.
+  refused.
 - **Progress.** When the client sent `window.workDoneProgress`, the server sends
   `window/workDoneProgress/create`, then one `$/progress` `begin` (with a `title`,
   `cancellable: false`), then one `$/progress` `end` with the same token. `end` comes on every
