@@ -3,7 +3,7 @@
   "displayName": "DynoTable",
   "icon": "media/icon.png",
   "description": "SQL, PartiQL and OpenSearch queries for DynamoDB and OpenSearch, served by the DynoTable desktop app.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "dynotable",
   "license": "MIT",
   "repository": {
