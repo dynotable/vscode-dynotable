@@ -106,8 +106,9 @@ after you close VS Code, and the next VS Code window uses it again.
 
 The extension is free. What runs depends on your DynoTable licence, as in the app:
 
-- **Free (signed in):** completion, diagnostics, and PartiQL `SELECT`.
-- **Trial or paid:** running SQL statements, as in the SQL Workbench.
+- **Free (signed in):** completion, diagnostics, PartiQL `SELECT`, and OpenSearch queries.
+- **Trial or paid:** running SQL statements, as in the SQL Workbench. This includes SQL that
+  reads an OpenSearch index and a JOIN across DynamoDB and OpenSearch.
 - **Signed out:** nothing. Sign in to DynoTable.
 
 See [Activation](https://dynotable.com/docs/activation) for the licence states.
