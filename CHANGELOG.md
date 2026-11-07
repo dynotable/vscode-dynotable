@@ -4,6 +4,10 @@
 
 - A click on a table or an index in the explorer opens a query for it, as its New Query button
   does.
+- The query plan shows in the lens row above the statement, after Run and Open in DynoTable. It no
+  longer sits after the cursor while you type.
+- Cmd+Enter (Ctrl+Enter) runs the query. Cmd+Shift+Enter (Ctrl+Shift+Enter) opens the statement at
+  the cursor in DynoTable. Change them in Keyboard Shortcuts.
 
 ## 0.1.0 — 2026-11-07
 

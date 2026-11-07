@@ -3,13 +3,24 @@ import * as vscode from 'vscode';
 import {
   CloseAction,
   ErrorAction,
+  InlayHintRequest,
   LanguageClient,
   LSPErrorCodes,
   ResponseError
 } from 'vscode-languageclient/node';
 import type {StartHandle, StartOutcome, StartParams} from './connect-core';
 import type {Listing} from './explorer-model';
-import {AUTH_FAILED, failureCodeOf, is, METHOD_NOT_FOUND, type Schema} from './protocol';
+import {planLenses} from './plan-lens';
+import {
+  AUTH_FAILED,
+  commandArgsSchema,
+  failureCodeOf,
+  inlayHintListSchema,
+  is,
+  METHOD_NOT_FOUND,
+  type Schema
+} from './protocol';
+import {RUN_STATEMENT} from './refusals';
 
 /** Also the settings prefix the library reads `trace.server` from. */
 const CLIENT_ID = 'dynotable';
@@ -157,6 +168,12 @@ export function startSession(
       },
       middleware: {
         executeCommand: (command, args) => onCommand(client, command, args),
+        // The plan shows in the lens row instead: inline, it sits after the caret while one types.
+        provideInlayHints: () => [],
+        provideCodeLenses: async (document, token, next): Promise<vscode.CodeLens[]> => {
+          const lenses = (await next(document, token)) ?? [];
+          return [...lenses, ...(await planLensesOf(client, document, lenses, token))];
+        },
         handleRegisterCapability: () => Promise.reject(refusal()),
         workspace: {
           handleApplyEdit: () => refusal(),
@@ -178,6 +195,38 @@ export function startSession(
     }
   );
   return {client, outcome, dispose: () => client.dispose()};
+}
+
+/** A failed or unreadable hint request leaves the lenses without a plan: the plan is a hint only. */
+async function planLensesOf(
+  client: LanguageClient,
+  document: vscode.TextDocument,
+  lenses: vscode.CodeLens[],
+  token: vscode.CancellationToken
+): Promise<vscode.CodeLens[]> {
+  const c2p = client.code2ProtocolConverter;
+  const whole = document.validateRange(new vscode.Range(0, 0, document.lineCount, 0));
+  let hints: unknown;
+  try {
+    hints = await client.sendRequest(
+      InlayHintRequest.method,
+      {textDocument: {uri: c2p.asUri(document.uri)}, range: c2p.asRange(whole)},
+      token
+    );
+  } catch {
+    return [];
+  }
+  if (!is(inlayHintListSchema, hints)) return [];
+  const statements = lenses.flatMap((lens) => {
+    const arg: unknown = lens.command?.arguments?.[0];
+    return lens.command?.command === RUN_STATEMENT && is(commandArgsSchema, arg) && arg.range
+      ? [{anchor: c2p.asRange(lens.range), statement: arg.range}]
+      : [];
+  });
+  return planLenses(statements, hints).map(
+    ({anchor, title}) =>
+      new vscode.CodeLens(client.protocol2CodeConverter.asRange(anchor), {title, command: ''})
+  );
 }
 
 export const unreadable = (what: string) =>

@@ -11,6 +11,7 @@ import type {ConnectCore} from './connect-core';
 import {applyPin, directiveLine, pinFor} from './directive';
 import type {Platform} from './discovery';
 import {indexFailures, queryOf, type Node, type Query} from './explorer-model';
+import {contains} from './plan-lens';
 import {pickerOf, type RequestedProfile} from './profiles';
 import {
   commandArgsSchema,
@@ -87,11 +88,8 @@ export async function runActiveEditor(deps: CommandDeps): Promise<void> {
     let range: Range | undefined;
     const {version} = document;
     try {
-      range = await statementAt(
-        client,
-        args.uri,
-        client.code2ProtocolConverter.asPosition(selection.active)
-      );
+      const caret = client.code2ProtocolConverter.asPosition(selection.active);
+      range = (await lensArgsAt(client, args.uri, caret, RUN_STATEMENT))?.range;
     } catch (error) {
       // Running the whole document instead could run statements the user did not mean to run.
       await report(deps, client, error, CodeLensRequest.method);
@@ -107,6 +105,45 @@ export async function runActiveEditor(deps: CommandDeps): Promise<void> {
     if (range) args.range = range;
   }
   await runStatement(deps, client, args);
+}
+
+/**
+ * `dynotable.open`: the Open in DynoTable lens of the statement under the caret, with the arguments
+ * the server gave it. The server decides which statements get one.
+ */
+export async function openActiveEditor(deps: CommandDeps): Promise<void> {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor || !deps.inScope(editor.document) || editor.document.languageId === 'opensearch') {
+    void vscode.window.showInformationMessage(
+      'Open a DynoTable SQL or PartiQL query to open it in DynoTable.'
+    );
+    return;
+  }
+  const client = await deps.client();
+  if (!client) return;
+  const {document, selection} = editor;
+  const {version} = document;
+  let args: CommandArgs | undefined;
+  try {
+    const caret = client.code2ProtocolConverter.asPosition(selection.active);
+    args = await lensArgsAt(client, document.uri.toString(), caret, OPEN_IN_APP);
+  } catch (error) {
+    await report(deps, client, error, CodeLensRequest.method);
+    return;
+  }
+  if (document.version !== version) {
+    void vscode.window.showInformationMessage(
+      'The query changed before DynoTable opened it. Try again.'
+    );
+    return;
+  }
+  if (!args) {
+    void vscode.window.showInformationMessage(
+      'DynoTable cannot open this statement. Put the cursor in a statement that shows Open in DynoTable.'
+    );
+    return;
+  }
+  await serverCommand(deps, client, OPEN_IN_APP, [args]);
 }
 
 /**
@@ -267,26 +304,21 @@ async function openQuery({language, text}: Query): Promise<void> {
   await vscode.window.showTextDocument(document);
 }
 
-/** The argument range of the server's Run lens around `caret`. Lens ranges are anchors only. */
-async function statementAt(
+/** The argument of the server's `command` lens around `caret`. Lens ranges are anchors only. */
+async function lensArgsAt(
   client: LanguageClient,
   uri: string,
-  caret: Position
-): Promise<Range | undefined> {
+  caret: Position,
+  command: string
+): Promise<CommandArgs | undefined> {
   const lenses = await client.sendRequest(CodeLensRequest.type, {textDocument: {uri}});
   for (const lens of lenses ?? []) {
     const arg: unknown = lens.command?.arguments?.[0];
-    if (lens.command?.command !== RUN_STATEMENT || !is(commandArgsSchema, arg)) continue;
-    if (arg.range && contains(arg.range, caret)) return arg.range;
+    if (lens.command?.command !== command || !is(commandArgsSchema, arg)) continue;
+    if (arg.range && contains(arg.range, caret)) return arg;
   }
   return undefined;
 }
-
-const before = (a: Position, b: Position) =>
-  a.line < b.line || (a.line === b.line && a.character <= b.character);
-
-const contains = (range: Range, position: Position) =>
-  before(range.start, position) && before(position, range.end);
 
 async function runStatement(
   deps: CommandDeps,

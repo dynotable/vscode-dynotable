@@ -111,6 +111,12 @@ export interface CodeLens {
   command: {title: string; command: string; arguments: [CommandArgs]};
 }
 
+/** The server sends no `kind`, `tooltip` or `paddingLeft` the extension reads. */
+export interface InlayHint {
+  position: Position;
+  label: string | Array<{value: string}>;
+}
+
 export interface ProgressParams {
   token: string | number;
   value: {kind: 'begin'; title: string; cancellable?: boolean} | {kind: 'end'};
@@ -292,6 +298,12 @@ export const codeLensListSchema = arrayOf(
     command: object({title: str, command: str, arguments: lensArguments})
   })
 );
+
+const hintLabel = schema<InlayHint['label']>((value, mode, path) =>
+  typeof value === 'string' ? undefined : arrayOf(object({value: str})).check(value, mode, path)
+);
+
+export const inlayHintListSchema = arrayOf(object<InlayHint>({position, label: hintLabel}));
 
 const progressToken = schema<string | number>((value, _mode, path) =>
   typeof value === 'string' || typeof value === 'number'

@@ -92,6 +92,10 @@ function answers(key: string, answer: unknown, text: string): boolean {
       ({label}) => !text.includes(typeof label === 'string' ? label : label.label)
     );
   }
+  // The server's plan hint shows in the lens row, as a lens with no command.
+  if (key === 'codeLensProvider') {
+    return (answer as vscode.CodeLens[]).some((lens) => lens.command?.command === '');
+  }
   if (key === 'documentHighlightProvider') {
     return (answer as vscode.DocumentHighlight[]).some(
       ({kind}) => kind !== vscode.DocumentHighlightKind.Text
@@ -111,7 +115,8 @@ type Cells = Record<string, Cell | 'none'> & {diagnostics: Cell};
 /**
  * Per dialect, a buffer that gets a non-empty answer, or `none` where the spec gives none:
  * formatting is not offered for PartiQL, definition, highlight and rename read SQL table aliases
- * only, and an OpenSearch query gets no lens and no inlay hint. `diagnostics` holds a mistake that
+ * only, and an OpenSearch query gets no lens and no inlay hint. The extension shows no inlay hint:
+ * the plan moves to the lens row. `diagnostics` holds a mistake that
  * has a quick fix.
  */
 function cellsOf(index: string): Record<string, Cells> {
@@ -129,7 +134,7 @@ function cellsOf(index: string): Record<string, Cells> {
       codeActionProvider: commaJoin,
       codeLensProvider: alias,
       hoverProvider: alias,
-      inlayHintProvider: alias,
+      inlayHintProvider: 'none',
       documentFormattingProvider: alias,
       definitionProvider: alias,
       documentHighlightProvider: alias,
@@ -141,7 +146,7 @@ function cellsOf(index: string): Record<string, Cells> {
       codeActionProvider: like,
       codeLensProvider: table,
       hoverProvider: table,
-      inlayHintProvider: table,
+      inlayHintProvider: 'none',
       documentFormattingProvider: 'none',
       definitionProvider: 'none',
       documentHighlightProvider: 'none',
