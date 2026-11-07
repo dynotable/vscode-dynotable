@@ -82,9 +82,10 @@ describe('cells', () => {
     ]);
   });
 
-  it('keeps exact-decimal text as text in the JSON copy', () => {
-    const json = toJson(result({columns: ['n'], rows: [{n: '12345678901234567890.123'}]}));
-    expect(json).toContain('"n": "12345678901234567890.123"');
+  // A number JSON cannot hold arrives as {"N": "<exact>"}; the copy must not turn it into a lossy number.
+  it('keeps an exact-decimal number as its tagged text in the JSON copy', () => {
+    const json = toJson(result({columns: ['n'], rows: [{n: {N: '12345678901234567890.123'}}]}));
+    expect(json).toContain('"N": "12345678901234567890.123"');
   });
 });
 
