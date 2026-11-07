@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.1 — unreleased
+## 0.1.1 — 2026-11-07
 
 - A click on a table or an index in the explorer opens a query for it, as its New Query button
   does.
