@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 — unreleased
+## 0.1.0 — 2026-11-07
 
 First release. Needs DynoTable 1.19.0 or later.
 

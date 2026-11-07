@@ -3,6 +3,8 @@
 Write SQL, PartiQL and OpenSearch queries in VS Code. The [DynoTable](https://dynotable.com)
 desktop app serves the language features and runs the queries.
 
+![DynoTable for VS Code: a SQL JOIN across a DynamoDB table and an OpenSearch index](media/screenshot.png)
+
 - Completion from your real table schemas and index mappings.
 - Diagnostics with quick fixes, hover, inlay hints (the query plan), formatting, and rename of
   table aliases.

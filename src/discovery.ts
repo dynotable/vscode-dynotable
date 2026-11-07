@@ -11,8 +11,8 @@ export type Env = Record<string, string | undefined>;
 /** Mirrors `vscode.ExtensionMode`, which a pure module cannot import. */
 export type ExtensionMode = 'production' | 'development' | 'test';
 
-/** The first app release that serves everything this extension needs, pre-releases included. */
-export const MIN_APP_VERSION = '1.19.0-0';
+/** The first app release that serves everything this extension needs. Its pre-releases do not pass. */
+export const MIN_APP_VERSION = '1.19.0';
 
 /** Synchronous file reads; each one throws when the path is missing. */
 export interface Fs {

@@ -4,7 +4,8 @@
  * for the preconditions.
  *
  *   pnpm contract:record --profile <id|slug> --table <name> --large-table <name> --index <name>
- *     --set-table <name> --sql <a SELECT that names its columns> [--user-data-dir <dir>]
+ *     --set-table <name> --sql <a SELECT that names its columns>
+ *     --projection-sql <a SELECT that names Set columns> [--user-data-dir <dir>]
  *   pnpm contract:check  (same options)
  */
 import {readFileSync, writeFileSync} from 'node:fs';
@@ -35,6 +36,8 @@ interface Options {
   setTable: string;
   index: string;
   sql: string;
+  /** Names Set columns, so a projected Set answers the shape of `SELECT *`. */
+  projectionSql: string;
   userDataDir: string | undefined;
 }
 
@@ -117,7 +120,7 @@ async function waitFor<T>(read: () => T | undefined, what: string): Promise<T> {
 /** Every answer and refusal the fixtures hold, keyed by fixture file. Unscrubbed. */
 async function capture(file: PortFile, options: Options): Promise<Map<string, unknown>> {
   const out = new Map<string, unknown>();
-  const {table, largeTable, setTable, index, sql} = options;
+  const {table, largeTable, setTable, index, sql, projectionSql} = options;
 
   const stranger = await open(file.port);
   out.set(
@@ -182,6 +185,10 @@ async function capture(file: PortFile, options: Options): Promise<Map<string, un
     openDocument(peer, uri, languageId, `SELECT * FROM "${setTable}"`);
     out.set(fixture, await run(peer, {uri}).response);
   }
+
+  const projectionUri = 'file:///contract/projection.dynotable.sql';
+  openDocument(peer, projectionUri, 'sql', projectionSql);
+  out.set('run-sql-projection.json', await run(peer, {uri: projectionUri}).response);
 
   const openSearchUri = 'file:///contract/query.opensearch';
   openDocument(
@@ -341,6 +348,16 @@ function compare(file: string, manifest: Manifest, actual: unknown): string | un
       return codesOf(actual) === codesOf(expected)
         ? undefined
         : `refusal ${codesOf(actual)}, fixture ${codesOf(expected)}`;
+    case 'runResult': {
+      // The guard does not look inside a row, so a changed cell type (a Set as an array) shows here.
+      const row = (value: unknown) => shape((value as {rows: unknown}).rows);
+      if (shape(actual) !== shape(expected)) {
+        return `shape {${shape(actual)}}, fixture {${shape(expected)}}`;
+      }
+      return row(actual) === row(expected)
+        ? undefined
+        : `first row {${row(actual)}}, fixture {${row(expected)}}`;
+    }
     default:
       return shape(actual) === shape(expected)
         ? undefined
@@ -368,6 +385,7 @@ async function main(): Promise<void> {
       'set-table': {type: 'string'},
       index: {type: 'string'},
       sql: {type: 'string'},
+      'projection-sql': {type: 'string'},
       'user-data-dir': {type: 'string'}
     }
   });
@@ -380,6 +398,7 @@ async function main(): Promise<void> {
     setTable: values['set-table'] ?? fail('--set-table is required'),
     index: values.index ?? fail('--index is required'),
     sql: values.sql ?? fail('--sql is required'),
+    projectionSql: values['projection-sql'] ?? fail('--projection-sql is required'),
     userDataDir: values['user-data-dir']
   };
   const platform = currentPlatform();
