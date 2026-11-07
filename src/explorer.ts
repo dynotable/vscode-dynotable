@@ -99,6 +99,9 @@ export class Explorer implements vscode.TreeDataProvider<Node>, vscode.Disposabl
     item.iconPath = new vscode.ThemeIcon(ICONS[node.kind]);
     item.contextValue = node.kind;
     if (node.kind === 'message') item.tooltip = node.text;
+    if (node.kind === 'table' || node.kind === 'index') {
+      item.command = {command: 'dynotable.newQuery', title: 'New Query', arguments: [node]};
+    }
     return item;
   }
 

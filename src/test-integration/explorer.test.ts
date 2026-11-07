@@ -146,6 +146,18 @@ describe('explorer', () => {
     assert.deepEqual(labels(await children(await group('DynamoDB'))), ['after-switch']);
   });
 
+  // A row with no command does nothing on click; New Query hides as a hover icon.
+  it('a click on a table row opens its SELECT * query', async () => {
+    const [table] = await children(await group('DynamoDB'));
+    assert.ok(table);
+    const {command} = (await api()).explorer.item(table);
+    assert.ok(command);
+    await vscode.commands.executeCommand(command.command, ...(command.arguments ?? []));
+    const document = vscode.window.activeTextEditor?.document;
+    assert.equal(document?.languageId, 'sql');
+    assert.equal(document.getText(), 'SELECT * FROM "after-switch"');
+  });
+
   it('New query on an index opens an opensearch buffer with a directive', async () => {
     const targets = await children(await group('OpenSearch'));
     const [index] = await children(targets[0]);

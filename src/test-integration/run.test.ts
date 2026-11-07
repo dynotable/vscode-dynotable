@@ -167,6 +167,69 @@ describe('run', () => {
     ]);
   });
 
+  // Inline, the plan sits after the caret while one types.
+  it('plan: the server hint shows in its statement lens row, and not inline', async () => {
+    fake.handle('textDocument/inlayHint', () => [
+      {position: {line: 1, character: 26}, label: 'Scan customers · ~100 items'}
+    ]);
+    try {
+      const {uri} = (await show('plan.dynotable.sql')).document;
+      const lenses = await vscode.commands.executeCommand<vscode.CodeLens[]>(
+        'vscode.executeCodeLensProvider',
+        uri
+      );
+      const plan = lenses.find((lens) => lens.command?.title === 'Scan customers · ~100 items');
+      assert.equal(plan?.range.start.line, 1);
+      const hints = await vscode.commands.executeCommand<vscode.InlayHint[]>(
+        'vscode.executeInlayHintProvider',
+        uri,
+        new vscode.Range(0, 0, 2, 0)
+      );
+      assert.deepEqual(hints, []);
+    } finally {
+      fake.unhandle('textDocument/inlayHint');
+    }
+  });
+
+  // The server decides which statements get Open and with what arguments; the shortcut reuses them.
+  it('caret Open: sends the Open lens argument of the statement at the caret', async () => {
+    const seeded = {range: line(1, 26), seedStatement: true};
+    fake.handle('textDocument/codeLens', (params) => {
+      const {uri} = (params as {textDocument: {uri: string}}).textDocument;
+      return [
+        ...runLenses(params),
+        {
+          range: line(1, 0),
+          command: {title: 'Open in DynoTable', command: OPEN, arguments: [{uri, ...seeded}]}
+        }
+      ];
+    });
+    fake.handle(`command:${OPEN}`, () => null);
+    try {
+      const editor = await show('caret-open.dynotable.sql');
+      editor.selection = new vscode.Selection(1, 5, 1, 5);
+      await vscode.commands.executeCommand('dynotable.open');
+      assert.deepEqual(commandCalls(OPEN).at(-1), {uri: editor.document.uri.toString(), ...seeded});
+    } finally {
+      fake.handle('textDocument/codeLens', runLenses);
+    }
+  });
+
+  it('caret Open: a statement with no Open lens says so and sends nothing', async () => {
+    const editor = await show('caret-no-open.dynotable.sql');
+    editor.selection = new vscode.Selection(0, 5, 0, 5);
+    const opens = commandCalls(OPEN).length;
+    await vscode.commands.executeCommand('dynotable.open');
+    assert.equal(commandCalls(OPEN).length, opens);
+    assert.deepEqual(toasts, [
+      {
+        kind: 'information',
+        message:
+          'DynoTable cannot open this statement. Put the cursor in a statement that shows Open in DynoTable.'
+      }
+    ]);
+  });
+
   // Copy is the only route to the CSV formula guard.
   it('copy: Copy CSV and Copy JSON put the rows on the clipboard', async () => {
     await show('copy.dynotable.sql');

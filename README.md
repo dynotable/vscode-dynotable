@@ -6,8 +6,8 @@ desktop app serves the language features and runs the queries.
 ![DynoTable for VS Code: a SQL JOIN across a DynamoDB table and an OpenSearch index](media/screenshot.png)
 
 - Completion from your real table schemas and index mappings.
-- Diagnostics with quick fixes, hover, inlay hints (the query plan), formatting, and rename of
-  table aliases.
+- Diagnostics with quick fixes, hover, the query plan above each statement, formatting, and
+  rename of table aliases.
 - **Run** a statement. The rows show in a results panel.
 - An explorer of the tables and indices of your DynoTable profile.
 - **Open in DynoTable** opens the app at the statement's table or index.
@@ -56,13 +56,16 @@ Query do this for you. A target name that contains a space cannot be written the
 ## Use it
 
 - **New query.** Run **DynoTable: New Query** and choose SQL, PartiQL or OpenSearch. In the
-  explorer, the New Query button on a table or an index opens a query for it.
-- **Run.** Click the **Run** lens above a statement, or run **DynoTable: Run**. Run uses the
+  explorer, click a table or an index, or its New Query button, to open a query for it.
+- **Run.** Click the **Run** lens above a statement, press Cmd+Enter (Ctrl+Enter on Windows and
+  Linux), or run **DynoTable: Run**. Run uses the
   selection. With no selection, it uses the statement at the cursor, or else the whole file. An
   OpenSearch query runs the selection or the whole file.
 - **Results.** One panel shows the rows of the last run. It shows the total only when DynoTable
   knows it. A run returns up to 500 rows. **Copy CSV** and **Copy JSON** copy the rows. **Cancel**
   stops the run. Closing the panel also stops it. You can run one statement at a time.
+- **Open in DynoTable.** Click the **Open in DynoTable** lens, or press Cmd+Shift+Enter
+  (Ctrl+Shift+Enter) with the cursor in the statement. SQL and PartiQL only.
 - **Explorer.** The DynoTable icon in the activity bar opens it. It shows your DynamoDB tables and,
   for each OpenSearch target, its indices. **Refresh** reads the lists again.
 - **Pick index.** In an OpenSearch query, run **DynoTable: Pick Index** to write the index line.

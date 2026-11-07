@@ -18,6 +18,7 @@ import {
   attachSqlFile,
   newQuery,
   pickIndex,
+  openActiveEditor,
   runActiveEditor,
   selectProfile,
   serverCommand,
@@ -64,7 +65,11 @@ export interface TestApi {
     outcome(): RunOutcome | undefined;
     close(): void;
   };
-  explorer: {children(node?: Node): Promise<Node[]>; message(): string | undefined};
+  explorer: {
+    children(node?: Node): Promise<Node[]>;
+    item(node: Node): vscode.TreeItem;
+    message(): string | undefined;
+  };
   /** The connected session's client. */
   client(): LanguageClient | undefined;
 }
@@ -297,10 +302,20 @@ export function activate(context: vscode.ExtensionContext): TestApi | undefined 
   const connectFor = (document: vscode.TextDocument) => {
     if (inScope(document)) void connection.ensureConnected();
   };
+  /** Gates the Run and Open keybindings. */
+  const markScope = () => {
+    const document = vscode.window.activeTextEditor?.document;
+    void vscode.commands.executeCommand(
+      'setContext',
+      'dynotable.inScope',
+      document !== undefined && inScope(document)
+    );
+  };
   /** A selector change needs a new client. A latch holds until Reconnect or a new port file. */
   const reselect = () => {
     selector = documentSelector();
     matcher = toVscode(selector);
+    markScope();
     const {kind} = connection.current;
     if (kind !== 'idle' && kind !== 'latched') void connection.restart();
   };
@@ -309,7 +324,12 @@ export function activate(context: vscode.ExtensionContext): TestApi | undefined 
   let watcher = armWatcher();
 
   context.subscriptions.push(
-    vscode.workspace.onDidOpenTextDocument(connectFor),
+    vscode.workspace.onDidOpenTextDocument((document) => {
+      connectFor(document);
+      // A language change reopens the document in the same editor.
+      if (document === vscode.window.activeTextEditor?.document) markScope();
+    }),
+    vscode.window.onDidChangeActiveTextEditor(markScope),
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration('dynotable.sqlFiles')) reselect();
       // Another user data directory is another app: its port file decides, as after a restart.
@@ -323,6 +343,7 @@ export function activate(context: vscode.ExtensionContext): TestApi | undefined 
     vscode.commands.registerCommand(STATUS_COMMAND, async () => run(await pickAction(status()))),
     vscode.commands.registerCommand('dynotable.reconnect', () => connection.restart()),
     vscode.commands.registerCommand('dynotable.run', () => runActiveEditor(deps)),
+    vscode.commands.registerCommand('dynotable.open', () => openActiveEditor(deps)),
     vscode.commands.registerCommand('dynotable.openDocs', () => run('open-docs')),
     vscode.commands.registerCommand('dynotable.selectProfile', () => selectProfile(deps)),
     vscode.commands.registerCommand('dynotable.newQuery', (node?: Node) => newQuery(node)),
@@ -335,6 +356,7 @@ export function activate(context: vscode.ExtensionContext): TestApi | undefined 
   );
   // Editors restored at startup opened before activation.
   for (const document of vscode.workspace.textDocuments) connectFor(document);
+  markScope();
   if (explorer.view.visible) void connection.ensureConnected();
 
   if (!test) return undefined;
@@ -357,6 +379,7 @@ export function activate(context: vscode.ExtensionContext): TestApi | undefined 
     },
     explorer: {
       children: (node) => explorer.getChildren(node),
+      item: (node) => explorer.getTreeItem(node),
       message: () => explorer.view.message
     },
     client: currentClient
