@@ -10,57 +10,73 @@
   "rows": [
     {
       "itemId": "SET_BASIC",
-      "blobs": [
-        "QUFBQQ==",
-        "QkJCQg=="
-      ],
-      "label": "basic-set-item",
-      "scores": [
-        10,
-        20,
-        30
-      ],
-      "nestedMap": {
-        "innerLabel": "inner",
-        "innerTags": [
-          "inner-a",
-          "inner-b"
+      "blobs": {
+        "BS": [
+          "QUFBQQ==",
+          "QkJCQg=="
         ]
       },
-      "tags": [
-        "alpha",
-        "beta",
-        "gamma"
-      ]
+      "label": "basic-set-item",
+      "scores": {
+        "NS": [
+          "10",
+          "20",
+          "30"
+        ]
+      },
+      "nestedMap": {
+        "innerLabel": "inner",
+        "innerTags": {
+          "SS": [
+            "inner-a",
+            "inner-b"
+          ]
+        }
+      },
+      "tags": {
+        "SS": [
+          "alpha",
+          "beta",
+          "gamma"
+        ]
+      }
     },
     {
       "itemId": "SET_SECOND",
-      "blobs": [
-        "/w=="
-      ],
-      "label": "second-set-item",
-      "scores": [
-        1,
-        2,
-        3
-      ],
-      "nestedMap": {
-        "innerLabel": "inner-2",
-        "innerTags": [
-          "n1"
+      "blobs": {
+        "BS": [
+          "/w=="
         ]
       },
-      "tags": [
-        "x",
-        "y"
-      ]
+      "label": "second-set-item",
+      "scores": {
+        "NS": [
+          "1",
+          "2",
+          "3"
+        ]
+      },
+      "nestedMap": {
+        "innerLabel": "inner-2",
+        "innerTags": {
+          "SS": [
+            "n1"
+          ]
+        }
+      },
+      "tags": {
+        "SS": [
+          "x",
+          "y"
+        ]
+      }
     }
   ],
   "returnedRows": 2,
   "totalRows": 2,
   "truncated": false,
-  "approximateBytes": 359,
-  "elapsedMs": 3,
+  "approximateBytes": 427,
+  "elapsedMs": 5,
   "executedStatement": "SELECT * FROM \"set-types\"",
   "effectiveRowCap": 3
 }

@@ -244,7 +244,9 @@ interface RunResult {
   - For `partiql` and `opensearch`, `columns` is the union of the row keys in first-seen order. A
     row can lack a key.
 - **Values (`sql` and `partiql`).** Both dialects answer the same shapes:
-  - A string, a boolean and `null` come as JSON values. An absent attribute comes as `null`.
+  - A string, a boolean and `null` come as JSON values.
+  - When an item does not have an attribute that a `sql` projection names, the cell is `null`. A
+    `SELECT *` row and a `partiql` row do not have the key.
   - A number comes as a JSON number. A number that JSON cannot hold exactly comes as `{"N": "<exact
     decimal>"}`.
   - Binary comes as `{"B": "<base64>"}`.
