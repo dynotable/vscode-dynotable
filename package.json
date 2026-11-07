@@ -3,7 +3,7 @@
   "displayName": "DynoTable",
   "icon": "media/icon.png",
   "description": "SQL, PartiQL and OpenSearch queries for DynamoDB and OpenSearch, served by the DynoTable desktop app.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "dynotable",
   "license": "MIT",
   "repository": {
@@ -111,6 +111,11 @@
         "icon": "$(play)"
       },
       {
+        "command": "dynotable.open",
+        "title": "Open in DynoTable",
+        "category": "DynoTable"
+      },
+      {
         "command": "dynotable.newQuery",
         "title": "New Query",
         "category": "DynoTable",
@@ -165,6 +170,20 @@
         }
       ]
     },
+    "keybindings": [
+      {
+        "command": "dynotable.run",
+        "key": "ctrl+enter",
+        "mac": "cmd+enter",
+        "when": "editorTextFocus && dynotable.inScope"
+      },
+      {
+        "command": "dynotable.open",
+        "key": "ctrl+shift+enter",
+        "mac": "cmd+shift+enter",
+        "when": "editorTextFocus && dynotable.inScope"
+      }
+    ],
     "menus": {
       "view/title": [
         {
