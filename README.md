@@ -56,7 +56,7 @@ Query do this for you. A target name that contains a space cannot be written the
 ## Use it
 
 - **New query.** Run **DynoTable: New Query** and choose SQL, PartiQL or OpenSearch. In the
-  explorer, the New Query button on a table or an index opens a query for it.
+  explorer, click a table or an index, or its New Query button, to open a query for it.
 - **Run.** Click the **Run** lens above a statement, or run **DynoTable: Run**. Run uses the
   selection. With no selection, it uses the statement at the cursor, or else the whole file. An
   OpenSearch query runs the selection or the whole file.

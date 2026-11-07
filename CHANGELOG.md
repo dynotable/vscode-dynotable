@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1 — unreleased
+
+- A click on a table or an index in the explorer opens a query for it, as its New Query button
+  does.
+
 ## 0.1.0 — 2026-11-07
 
 First release. Needs DynoTable 1.19.0 or later.

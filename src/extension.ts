@@ -64,7 +64,11 @@ export interface TestApi {
     outcome(): RunOutcome | undefined;
     close(): void;
   };
-  explorer: {children(node?: Node): Promise<Node[]>; message(): string | undefined};
+  explorer: {
+    children(node?: Node): Promise<Node[]>;
+    item(node: Node): vscode.TreeItem;
+    message(): string | undefined;
+  };
   /** The connected session's client. */
   client(): LanguageClient | undefined;
 }
@@ -357,6 +361,7 @@ export function activate(context: vscode.ExtensionContext): TestApi | undefined 
     },
     explorer: {
       children: (node) => explorer.getChildren(node),
+      item: (node) => explorer.getTreeItem(node),
       message: () => explorer.view.message
     },
     client: currentClient
