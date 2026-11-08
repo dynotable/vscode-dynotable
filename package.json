@@ -1,9 +1,9 @@
 {
   "name": "vscode-dynotable",
-  "displayName": "DynoTable",
+  "displayName": "DynoTable – DynamoDB & OpenSearch SQL",
   "icon": "media/icon.png",
-  "description": "SQL, PartiQL and OpenSearch queries for DynamoDB and OpenSearch, served by the DynoTable desktop app.",
-  "version": "0.1.1",
+  "description": "SQL and PartiQL for DynamoDB, SQL and query DSL for OpenSearch, and SQL joins across both. Requires the DynoTable desktop app.",
+  "version": "0.1.2",
   "publisher": "dynotable",
   "license": "MIT",
   "repository": {
@@ -25,7 +25,25 @@
     "vscode": "^1.91.0"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Linters",
+    "Formatters"
+  ],
+  "keywords": [
+    "dynamodb",
+    "opensearch",
+    "sql",
+    "partiql",
+    "query dsl",
+    "lucene",
+    "aws",
+    "nosql",
+    "database",
+    "dynamodb client",
+    "dynamodb gui",
+    "dynamodb sql",
+    "opensearch sql",
+    "join"
   ],
   "extensionKind": [
     "ui"
