@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2 — 2026-11-08
+
+- The Marketplace listing says which query language works with which engine. Its name and tags
+  name DynamoDB, OpenSearch and SQL.
+- The README says that OpenSearch queries run on the free licence.
+
 ## 0.1.1 — 2026-11-07
 
 - A click on a table or an index in the explorer opens a query for it, as its New Query button
