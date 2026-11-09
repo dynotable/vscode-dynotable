@@ -25,8 +25,10 @@ import {RUN_STATEMENT} from './refusals';
 /** Also the settings prefix the library reads `trace.server` from. */
 const CLIENT_ID = 'dynotable';
 
-/** New query names its untitled SQL buffers so; other untitled SQL is not DynoTable's. */
+/** Untitled SQL is DynoTable's only under this name or `.dtsql`. */
 const UNTITLED_SQL = '**/*.dynotable.sql';
+/** DynoTable's own SQL extension: it attaches in both schemes, inside a folder or not. */
+const DTSQL = '**/*.dtsql';
 
 /** A protocol document filter. A relative pattern's `baseUri` is a string: see `toVscode`. */
 export interface Filter {
@@ -39,10 +41,11 @@ const sqlFiles = (folder?: vscode.WorkspaceFolder) =>
   vscode.workspace.getConfiguration('dynotable', folder).get<string[]>('sqlFiles') ?? [];
 
 /**
- * `sql` attaches only through `dynotable.sqlFiles` and New query's untitled buffers. Each folder's
- * own value decides what attaches in that folder, as patterns relative to it. With no folder open,
- * the entries that begin with `**\/` match the absolute path. In a window with folders, a `sql` file
- * outside every folder does not attach: a string pattern would also match inside the folders.
+ * `sql` attaches through `.dtsql`, `dynotable.sqlFiles` and untitled `*.dynotable.sql`. Each folder's
+ * own `sqlFiles` decides what attaches in that folder, as patterns relative to it. With no folder
+ * open, the entries that begin with `**\/` match the absolute path. In a window with folders, a
+ * `sqlFiles` match outside every folder does not attach: a string pattern would also match inside
+ * the folders.
  */
 export function documentSelector(): Filter[] {
   const selector: Filter[] = [];
@@ -50,6 +53,9 @@ export function documentSelector(): Filter[] {
     for (const scheme of ['file', 'untitled']) selector.push({language, scheme});
   }
   selector.push({language: 'sql', scheme: 'untitled', pattern: UNTITLED_SQL});
+  for (const scheme of ['file', 'untitled']) {
+    selector.push({language: 'sql', scheme, pattern: DTSQL});
+  }
   const folders = vscode.workspace.workspaceFolders ?? [];
   for (const folder of folders) {
     for (const pattern of sqlFiles(folder)) {

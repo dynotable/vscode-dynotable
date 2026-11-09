@@ -23,6 +23,7 @@ describe('editor commands', () => {
     await vscode.commands.executeCommand('dynotable.newQuery');
     const document = active();
     assert.equal(document.languageId, 'sql');
+    assert.ok(document.uri.path.endsWith('.dtsql'), document.uri.toString());
     await waitFor('didOpen of the New query buffer', () => fake.opened(document.uri.toString()));
   });
 

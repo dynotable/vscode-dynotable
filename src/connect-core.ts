@@ -3,7 +3,7 @@ import type {PortFile} from './protocol';
 import type {LatchedReason} from './reasons';
 
 /** Longer than the server's own 30 s handshake deadline, so the server's answer arrives first. */
-const INIT_TIMEOUT_MS = 40_000;
+export const INIT_TIMEOUT_MS = 40_000;
 /** How long a cold `--headless` start may run with no port file. */
 const COLD_START_MS = 30_000;
 /** How long to wait for the port file after a running app was nudged (exit 0). */
@@ -21,10 +21,15 @@ export interface Socket {
   destroy(): void;
 }
 
+type ExitListener = (code: number | null, signal: string | null) => void;
+type ErrorListener = (error: Error) => void;
+
 export interface Child {
   once(event: 'spawn', listener: () => void): unknown;
-  once(event: 'exit', listener: (code: number | null, signal: string | null) => void): unknown;
-  once(event: 'error', listener: (error: Error) => void): unknown;
+  once(event: 'exit', listener: ExitListener): unknown;
+  once(event: 'error', listener: ErrorListener): unknown;
+  off(event: 'exit', listener: ExitListener): unknown;
+  off(event: 'error', listener: ErrorListener): unknown;
   unref(): void;
 }
 
@@ -64,6 +69,11 @@ export interface CoreSeams {
   minAppVersion: string;
   /** True while `dynotable.userDataDir` is set: the user starts the app. */
   launcherOff(): boolean;
+  /**
+   * While the launcher is off and no usable port file exists, wait this long for one before
+   * latching `launcher-off`. Unset: latch at once.
+   */
+  awaitPortFileMs?: number;
   readPortFile(): PortFile | undefined;
   /** `process.kill`: signal 0 throws when the pid is dead or owned by another user. */
   kill(pid: number, signal: 0): void;
@@ -148,7 +158,10 @@ function spawnOptions(home: string, env: Env): SpawnOptions {
 
 const keyOf = (file: PortFile) => `${file.port}\n${file.token}`;
 
-type LaunchResult = PortFile | LatchedReason;
+/** How a wait settles after `stop()`. It is not a reason: nothing latches. */
+type Stopped = 'stopped';
+
+type LaunchResult = PortFile | LatchedReason | Stopped;
 
 interface Live {
   id: number;
@@ -174,8 +187,14 @@ export class ConnectCore {
   private queued: Promise<void> | undefined;
   private runs = 0;
   private runWaiters: Array<() => void> = [];
+  /** Aborted by `stop()`. Every wait settles on it. */
+  private readonly stopping = new AbortController();
 
   constructor(private readonly seams: CoreSeams) {}
+
+  private get stopped(): boolean {
+    return this.stopping.signal.aborted;
+  }
 
   get current(): State {
     return this.state;
@@ -206,6 +225,7 @@ export class ConnectCore {
       this.restarting = true;
       try {
         await this.inFlight;
+        if (this.stopped) return;
         if (this.runs > 0) {
           this.setState({kind: 'waiting-for-run'});
           await new Promise<void>((resolve) => this.runWaiters.push(resolve));
@@ -213,6 +233,7 @@ export class ConnectCore {
         // A request on the stopping client fails; the status must say why.
         this.setState({kind: 'starting'});
         await this.dispose();
+        if (this.stopped) return;
         this.state = {kind: 'idle'};
         await this.ensureConnected();
       } finally {
@@ -280,6 +301,17 @@ export class ConnectCore {
     if (live) await close(live.handle, live.socket);
   }
 
+  /**
+   * Ends the core for good: every wait settles, an attempt in flight disposes its handle and
+   * destroys its socket, and the live session closes. After it, nothing spawns, starts a session or
+   * reports a state.
+   */
+  async stop(): Promise<void> {
+    this.stopping.abort();
+    for (const resolve of this.runWaiters.splice(0)) resolve();
+    await this.dispose();
+  }
+
   private check(): void {
     if (this.state.kind === 'idle') return;
     const file = this.seams.readPortFile();
@@ -288,6 +320,7 @@ export class ConnectCore {
   }
 
   private setState(state: State): void {
+    if (this.stopped) return;
     this.state = state;
     this.seams.onState(state);
   }
@@ -297,17 +330,20 @@ export class ConnectCore {
     this.setState({kind: 'starting'});
     // A seam that throws must still latch, or the state stays `starting` with nothing running.
     const result = await this.connect(id).catch((): LatchedReason => 'start-failed');
+    if (result === 'stopped') return;
     if (typeof result === 'string') this.setState({kind: 'latched', reason: result});
     else this.setState({kind: 'connected', version: result.version, attempt: id});
   }
 
-  private async connect(id: number): Promise<LatchedReason | {version: string}> {
+  private async connect(id: number): Promise<LatchedReason | Stopped | {version: string}> {
     let file = this.seams.readPortFile();
     let launched = false;
     let authRetried = false;
     for (;;) {
+      if (this.stopped) return 'stopped';
       const socket = file && this.isLive(file) ? await this.open(file) : 'stale';
       if (socket === 'failed') return 'start-failed';
+      if (socket === 'stopped') return socket;
       if (!file || socket === 'stale') {
         // A dead pid's file never reaches `open()`; its key still must not relaunch on a watcher echo.
         if (file) this.lastKey = keyOf(file);
@@ -325,6 +361,10 @@ export class ConnectCore {
         onClosed: () => this.closed(id)
       });
       const outcome = await this.withTimeout(handle.outcome);
+      if (outcome.kind === 'stopped' || this.stopped) {
+        await close(handle, socket);
+        return 'stopped';
+      }
       if (outcome.kind === 'ok') {
         if (
           outcome.version === undefined ||
@@ -357,25 +397,36 @@ export class ConnectCore {
   }
 
   private async withTimeout(outcome: Promise<StartOutcome>) {
+    const {signal} = this.stopping;
     let timer: NodeJS.Timeout | undefined;
-    const timeout = new Promise<{kind: 'timeout'}>((resolve) => {
+    let onStop: (() => void) | undefined;
+    const timeout = new Promise<{kind: 'timeout'} | {kind: Stopped}>((resolve) => {
       timer = setTimeout(() => resolve({kind: 'timeout'}), INIT_TIMEOUT_MS);
+      onStop = () => resolve({kind: 'stopped'});
+      signal.addEventListener('abort', onStop, {once: true});
     });
     try {
       return await Promise.race([outcome, timeout]);
     } finally {
       clearTimeout(timer);
+      if (onStop) signal.removeEventListener('abort', onStop);
     }
   }
 
   /** `stale` when the port is closed: a killed app leaves its file behind. */
-  private async open(file: PortFile): Promise<Socket | 'stale' | 'failed'> {
+  private async open(file: PortFile): Promise<Socket | 'stale' | 'failed' | Stopped> {
     this.lastKey = keyOf(file);
+    let socket: Socket;
     try {
-      return await this.seams.connect(file.port);
+      socket = await this.seams.connect(file.port);
     } catch (error) {
+      if (this.stopped) return 'stopped';
       return (error as NodeJS.ErrnoException).code === 'ECONNREFUSED' ? 'stale' : 'failed';
     }
+    // A connect cannot be cancelled, so a socket that arrives after `stop()` is dropped here.
+    if (!this.stopped) return socket;
+    socket.destroy();
+    return 'stopped';
   }
 
   /**
@@ -406,7 +457,11 @@ export class ConnectCore {
   }
 
   private async launch(stale: PortFile | undefined): Promise<LaunchResult> {
-    if (this.seams.launcherOff()) return 'launcher-off';
+    if (this.seams.launcherOff()) {
+      const ms = this.seams.awaitPortFileMs;
+      if (ms === undefined) return 'launcher-off';
+      return (await this.waitForFile(stale, ms)) ?? 'launcher-off';
+    }
     const app = this.seams.locateApp();
     if (!app) return 'not-installed';
     // An old app would open its full window, so it is never spawned.
@@ -417,6 +472,7 @@ export class ConnectCore {
       const result = await this.spawnHeadless(app.binary, stale);
       if (result !== 'nudged') return result;
       const file = await this.waitForFile(stale, NUDGE_WAIT_MS);
+      // A `stopped` wait is truthy and ends the loop too.
       if (file) return file;
       // The holder may have been quitting, so one more spawn can become the primary.
       if (spawns === 2) return 'not-serving';
@@ -440,28 +496,44 @@ export class ConnectCore {
         if (settled) return;
         settled = true;
         file.cancel();
+        child.off('error', onError);
+        child.off('exit', onExit);
         resolve(result);
       };
-      child.once('error', () => settle('spawn-failed'));
-      child.once('exit', (code) => settle(EXIT_RESULTS[code ?? -1] ?? 'crashed'));
+      const onError = () => settle('spawn-failed');
+      const onExit: ExitListener = (code) => settle(EXIT_RESULTS[code ?? -1] ?? 'crashed');
+      child.once('error', onError);
+      child.once('exit', onExit);
+      // `waitForFile` settles `stopped` on `stop()` as well.
       void file.then((found) => settle(found ?? 'timed-out'));
     });
   }
 
-  /** Polls for a port file whose `(port, token)` differs from `stale`. */
+  /**
+   * Polls for a port file whose `(port, token)` differs from `stale`. Settles `undefined` at the
+   * end of `ms` or on `cancel()`, and `stopped` on `stop()`.
+   */
   private waitForFile(stale: PortFile | undefined, ms: number) {
     const handle = {cancel: () => {}};
-    const promise = new Promise<PortFile | undefined>((resolve) => {
-      const finish = (file: PortFile | undefined) => {
+    const {signal} = this.stopping;
+    const promise = new Promise<PortFile | Stopped | undefined>((resolve) => {
+      if (signal.aborted) {
+        resolve('stopped');
+        return;
+      }
+      const finish = (file: PortFile | Stopped | undefined) => {
         clearInterval(poll);
         clearTimeout(timer);
+        signal.removeEventListener('abort', onStop);
         resolve(file);
       };
+      const onStop = () => finish('stopped');
       const poll = setInterval(() => {
         const file = this.seams.readPortFile();
         if (file && (!stale || keyOf(file) !== keyOf(stale))) finish(file);
       }, POLL_MS);
       const timer = setTimeout(() => finish(undefined), ms);
+      signal.addEventListener('abort', onStop, {once: true});
       handle.cancel = () => finish(undefined);
     });
     return Object.assign(promise, handle);

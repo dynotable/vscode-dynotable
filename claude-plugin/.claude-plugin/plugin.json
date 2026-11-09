@@ -1,0 +1,13 @@
+{
+  "name": "dynotable",
+  "version": "0.1.0",
+  "description": "Read DynamoDB and OpenSearch through the DynoTable desktop app: a skill for the dynotable-cli command, and diagnostics and hover for .dtsql, .partiql and .opensearch files.",
+  "author": {
+    "name": "DynoTable",
+    "url": "https://dynotable.com"
+  },
+  "homepage": "https://dynotable.com/docs/editors",
+  "repository": "https://github.com/dynotable/vscode-dynotable",
+  "license": "MIT",
+  "keywords": ["dynamodb", "opensearch", "sql", "partiql", "lsp"]
+}

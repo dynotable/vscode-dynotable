@@ -1,0 +1,14 @@
+{
+  "name": "@dynotable/cli-{{target}}",
+  "version": "{{version}}",
+  "description": "The dynotable-cli binary for {{target}}. Install dynotable-cli, not this package.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dynotable/vscode-dynotable.git"
+  },
+  "os": ["{{os}}"],
+  "cpu": ["{{cpu}}"],
+  "files": ["bin/"],
+  "preferUnplugged": true
+}
