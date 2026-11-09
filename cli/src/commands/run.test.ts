@@ -4,7 +4,8 @@ import {Readable} from 'node:stream';
 import {pathToFileURL} from 'node:url';
 import {describe, expect, it} from 'vitest';
 import {useHarness} from '../test-session';
-import {readDocument, run, type RunInput} from './run';
+import type {Input} from '../args';
+import {readDocument, run} from './run';
 
 const h = useHarness();
 
@@ -12,10 +13,7 @@ const STATEMENT = 'SELECT * FROM "orders"\nWHERE "id" = \'1\'\n';
 
 const message = (method: string) => h.fake.received.find((m) => m.method === method);
 
-async function runOf(
-  input: RunInput,
-  {stdin = '', rowCap}: {stdin?: string; rowCap?: number} = {}
-) {
+async function runOf(input: Input, {stdin = '', rowCap}: {stdin?: string; rowCap?: number} = {}) {
   const read = await readDocument(input, {cwd: h.cwd, path}, Readable.from([stdin]));
   if (!('document' in read)) throw new Error(`no document: ${JSON.stringify(read)}`);
   await h.run(run(read.document, rowCap));
@@ -25,7 +23,7 @@ describe('run', () => {
   it('opens a file under its file URI with the file content', async () => {
     await h.fake.start();
     writeFileSync(path.join(h.cwd, 'q.dtsql'), STATEMENT);
-    await runOf({input: {kind: 'file', path: 'q.dtsql'}});
+    await runOf({kind: 'file', path: 'q.dtsql'});
     expect(message('textDocument/didOpen')?.params).toEqual({
       textDocument: {
         uri: pathToFileURL(path.join(h.cwd, 'q.dtsql')).href,
@@ -36,18 +34,18 @@ describe('run', () => {
     });
   });
 
-  const untitled: Array<[string, RunInput, string]> = [
-    ['stdin', {input: {kind: 'stdin'}, lang: 'partiql'}, 'untitled:dynotable-cli/1.partiql'],
+  const untitled: Array<[string, Exclude<Input, {kind: 'file'}>, string]> = [
+    ['stdin', {kind: 'stdin', lang: 'partiql'}, 'untitled:dynotable-cli/1.partiql'],
     [
       '-e',
-      {input: {kind: 'text', text: STATEMENT}, lang: 'opensearch'},
+      {kind: 'text', text: STATEMENT, lang: 'opensearch'},
       'untitled:dynotable-cli/1.opensearch'
     ]
   ];
   it.each(untitled)('opens %s as an untitled document of the --lang id', async (_, input, uri) => {
     await h.fake.start();
     // -e must not read stdin.
-    await runOf(input, {stdin: input.input.kind === 'stdin' ? STATEMENT : 'not this'});
+    await runOf(input, {stdin: input.kind === 'stdin' ? STATEMENT : 'not this'});
     expect(message('textDocument/didOpen')?.params).toEqual({
       textDocument: {uri, languageId: input.lang, version: 1, text: STATEMENT}
     });
@@ -55,7 +53,7 @@ describe('run', () => {
 
   it('runs the whole document with the row cap and prints one result document', async () => {
     await h.fake.start();
-    await runOf({input: {kind: 'text', text: STATEMENT}, lang: 'sql'}, {rowCap: 25});
+    await runOf({kind: 'text', text: STATEMENT, lang: 'sql'}, {rowCap: 25});
     // No range: the app runs the whole document.
     expect(message('workspace/executeCommand')?.params).toEqual({
       command: 'dynotable.runStatement',
@@ -70,7 +68,7 @@ describe('run', () => {
   // main.ts reads the input before it connects, so a bad input never starts the app.
   it('a missing file is a usage error', async () => {
     const read = await readDocument(
-      {input: {kind: 'file', path: 'missing.dtsql'}},
+      {kind: 'file', path: 'missing.dtsql'},
       {cwd: h.cwd, path},
       Readable.from([])
     );
@@ -80,7 +78,7 @@ describe('run', () => {
   // The name is checked before any read, so a missing file says nothing about the file system.
   it('a name that is not dedicated is refused before the file is read', async () => {
     const read = await readDocument(
-      {input: {kind: 'file', path: 'missing.sql'}},
+      {kind: 'file', path: 'missing.sql'},
       {cwd: h.cwd, path},
       Readable.from([])
     );
@@ -94,7 +92,7 @@ describe('run', () => {
     writeFileSync(path.join(h.cwd, 'credentials'), 'aws_secret_access_key = x');
     symlinkSync(path.join(h.cwd, 'credentials'), path.join(h.cwd, 'q.partiql'));
     const read = await readDocument(
-      {input: {kind: 'file', path: 'q.partiql'}},
+      {kind: 'file', path: 'q.partiql'},
       {cwd: h.cwd, path},
       Readable.from([])
     );

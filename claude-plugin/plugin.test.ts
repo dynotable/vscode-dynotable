@@ -57,7 +57,7 @@ describe('the Claude Code plugin', () => {
       ]);
       const place = {cwd: '/work', path: path.posix};
       for (const [extension, language] of Object.entries(server.extensionToLanguage)) {
-        expect(locate({kind: 'file', path: `q${extension}`}, undefined, place)).toMatchObject({
+        expect(locate({kind: 'file', path: `q${extension}`}, place)).toMatchObject({
           languageId: language
         });
       }

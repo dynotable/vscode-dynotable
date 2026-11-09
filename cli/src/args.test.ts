@@ -32,13 +32,12 @@ describe('subcommands', () => {
         command: 'run',
         agent: true,
         launch: true,
-        lang: 'sql',
-        input: {kind: 'text', text: 'SELECT * FROM orders'}
+        input: {kind: 'text', text: 'SELECT * FROM orders', lang: 'sql'}
       }
     ],
     [
       ['run', '-', '--lang', 'partiql'],
-      {command: 'run', agent: true, launch: true, lang: 'partiql', input: {kind: 'stdin'}}
+      {command: 'run', agent: true, launch: true, input: {kind: 'stdin', lang: 'partiql'}}
     ]
   ])('%j', (args, expected) => {
     expect(cli(...args)).toEqual({kind: 'command', ...expected});

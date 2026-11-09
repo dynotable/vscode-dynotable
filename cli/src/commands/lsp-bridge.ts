@@ -1,7 +1,7 @@
 import type {Socket} from 'node:net';
 import {fileURLToPath} from 'node:url';
 import type {StartHandle, StartOutcome, StartParams} from '../../../src/connect-core';
-import {REQUEST_FAILED, type WireError} from '../../../src/protocol';
+import {isObject, REQUEST_FAILED, type WireError} from '../../../src/protocol';
 import {frame, FrameReader, parseMessage, type Id, type Message} from '../../../src/rpc';
 import {readDotfile} from '../dotfile';
 import {EXIT, type Sink} from '../io';
@@ -42,10 +42,7 @@ type Initialize = Message & {id: Id};
 
 const EMPTY = Buffer.alloc(0);
 
-const record = (value: unknown): Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
+const record = (value: unknown): Record<string, unknown> => (isObject(value) ? value : {});
 
 /** The folder of `.dynotable.json`: the editor's root, else its first workspace folder, else `cwd`. */
 function rootOf(params: Record<string, unknown>, cwd: string): string {
@@ -76,7 +73,7 @@ export function createBridge(options: BridgeOptions): Bridge {
   /** The editor's bytes after `initialize`, until a session is connected. */
   let held: Buffer[] = [];
   let live: Socket | undefined;
-  /** The app's error answer to the latest attempt's `initialize`, as it sent it. */
+  /** The app's `refused` answer to the latest attempt's `initialize`, as it sent it. */
   let refusal: {answer: Buffer; error: WireError} | undefined;
   let shutdown = false;
   let ended = false;
@@ -116,8 +113,15 @@ export function createBridge(options: BridgeOptions): Bridge {
           socket.pause();
           handshake.toEditor.unshift(frame(body));
           handshake.toEditor.push(reader.remainder);
-          if (message.error) refusal = {answer: frame(body), error: message.error};
-          resolve(message.error ? refusedOutcome(message.error) : okOutcome(message.result));
+          if (!message.error) {
+            resolve(okOutcome(message.result));
+            return;
+          }
+          const refused = refusedOutcome(message.error);
+          // Only a `refused` answer latches `start-failed` at once. After an auth failure, the
+          // retry can latch `start-failed` with no answer of its own.
+          if (refused.kind === 'refused') refusal = {answer: frame(body), error: message.error};
+          resolve(refused);
           return;
         }
       };
@@ -133,12 +137,9 @@ export function createBridge(options: BridgeOptions): Bridge {
     };
   };
 
-  // Only `--no-launch` waits: a launching bridge has started the app itself.
+  // `ConnectCore` waits only while launching is off: `--no-launch` or `DYNOTABLE_USER_DATA_DIR`.
   const core = createCore(
-    {
-      ...options,
-      awaitPortFileMs: options.launch ? undefined : (options.awaitPortFileMs ?? AWAIT_PORT_FILE_MS)
-    },
+    {...options, awaitPortFileMs: options.awaitPortFileMs ?? AWAIT_PORT_FILE_MS},
     start
   );
 
@@ -236,7 +237,8 @@ export function createBridge(options: BridgeOptions): Bridge {
     if (ended) return;
     const state = core.current;
     if (state.kind === 'latched') {
-      // The app refused the editor's own `initialize`: its answer says why, the CLI's text cannot.
+      // A `refusal` is the app's answer to the editor's own `initialize`: it says why, the CLI's
+      // text cannot.
       if (state.reason === 'start-failed' && refusal) forward(refusal);
       else refuse(state.reason);
       return;

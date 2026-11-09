@@ -94,7 +94,9 @@ for (const target of targets) {
   const out = path.join(dist, target.name);
   rmSync(out, {recursive: true, force: true});
   const binary = path.join(out, 'bin', binaryName(target.platform));
-  compile(BUN_TARGETS[/** @type {keyof typeof BUN_TARGETS} */ (target.name)], binary);
+  const bunTarget = BUN_TARGETS[/** @type {keyof typeof BUN_TARGETS} */ (target.name)];
+  if (!bunTarget) fail(`No Bun target for ${target.name}.`);
+  compile(bunTarget, binary);
   stamp(target, out);
   if (release) archive(target, binary);
   console.log(`cli build: ${path.relative(root, binary)} ${version}`);
@@ -175,9 +177,12 @@ function archive(target, binary) {
   const folder = path.join(staging, base);
   rmSync(staging, {recursive: true, force: true});
   mkdirSync(folder, {recursive: true});
-  const exe = target.platform === 'win32' ? '.exe' : '';
-  copyFileSync(binary, path.join(folder, `dynotable-cli${exe}`));
-  linkSync(path.join(folder, `dynotable-cli${exe}`), path.join(folder, `dynotable-lsp${exe}`));
+  const name = binaryName(target.platform);
+  copyFileSync(binary, path.join(folder, name));
+  linkSync(
+    path.join(folder, name),
+    path.join(folder, name.replace('dynotable-cli', 'dynotable-lsp'))
+  );
   copyFileSync(license, path.join(folder, 'LICENSE'));
   const file = path.join(dist, `${base}.tar.gz`);
   const tar = spawnSync('tar', ['-czf', file, '-C', staging, base], {stdio: 'inherit'});

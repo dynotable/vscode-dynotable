@@ -85,7 +85,7 @@ async function workOf(given: Exclude<Command, {command: 'lsp'}>) {
     case 'indices':
       return list(given.command);
     case 'run': {
-      const read = await readDocument(given, {cwd: process.cwd(), path}, io.stdin);
+      const read = await readDocument(given.input, {cwd: process.cwd(), path}, io.stdin);
       if ('document' in read) return run(read.document, given.rowCap);
       emit(io, read);
       return undefined;

@@ -44,7 +44,6 @@ function fileUri(file: string, {cwd, path}: Place): string {
 /** The URI and language of an input, or why it has none. */
 export function locate(
   input: Input,
-  lang: Lang | undefined,
   place: Place
 ): {uri: string; languageId: Lang} | {message: string} {
   if (input.kind === 'file') {
@@ -56,7 +55,9 @@ export function locate(
     }
     return {uri: fileUri(input.path, place), languageId};
   }
-  if (!lang) return {message: '--lang is required with stdin and -e.'};
   // One document per process, so one name is enough.
-  return {uri: `untitled:dynotable-cli/1.${UNTITLED_EXTENSIONS[lang]}`, languageId: lang};
+  return {
+    uri: `untitled:dynotable-cli/1.${UNTITLED_EXTENSIONS[input.lang]}`,
+    languageId: input.lang
+  };
 }

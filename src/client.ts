@@ -53,8 +53,9 @@ export function documentSelector(): Filter[] {
     for (const scheme of ['file', 'untitled']) selector.push({language, scheme});
   }
   selector.push({language: 'sql', scheme: 'untitled', pattern: UNTITLED_SQL});
-  for (const scheme of ['file', 'untitled'])
+  for (const scheme of ['file', 'untitled']) {
     selector.push({language: 'sql', scheme, pattern: DTSQL});
+  }
   const folders = vscode.workspace.workspaceFolders ?? [];
   for (const folder of folders) {
     for (const pattern of sqlFiles(folder)) {

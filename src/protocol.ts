@@ -182,7 +182,7 @@ const oneOf = <T extends string>(members: readonly T[]) =>
     return undefined;
   });
 
-const isObject = (value: unknown): value is Record<string, unknown> =>
+export const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const arrayOf = <T>(item: Schema<T>) =>

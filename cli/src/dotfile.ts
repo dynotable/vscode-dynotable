@@ -1,5 +1,6 @@
 import {readFileSync} from 'node:fs';
 import {join} from 'node:path';
+import {isObject} from '../../src/protocol';
 
 const DOTFILE = '.dynotable.json';
 
@@ -24,10 +25,8 @@ export function readDotfile(dir: string): Dotfile {
   } catch {
     return {kind: 'error', message: `${path} is not valid JSON.`};
   }
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return {kind: 'error', message: `${path} must hold a JSON object.`};
-  }
-  const {profile} = value as {profile?: unknown};
+  if (!isObject(value)) return {kind: 'error', message: `${path} must hold a JSON object.`};
+  const {profile} = value;
   if (profile === undefined) return {kind: 'none'};
   if (typeof profile !== 'string') {
     return {kind: 'error', message: `"profile" in ${path} must be a string.`};

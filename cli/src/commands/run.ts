@@ -2,15 +2,10 @@ import {readFile, realpath} from 'node:fs/promises';
 import type {Readable} from 'node:stream';
 import {text} from 'node:stream/consumers';
 import {runResultSchema} from '../../../src/protocol';
-import type {Input, Lang} from '../args';
+import type {Input} from '../args';
 import {locate, type Place, type TextDocument} from '../document';
 import type {Failure, Result} from '../output';
 import type {Connection} from '../session';
-
-export interface RunInput {
-  input: Input;
-  lang?: Lang;
-}
 
 /**
  * A file's text, read only when the file it resolves to has a dedicated name too: a link such as
@@ -18,7 +13,7 @@ export interface RunInput {
  */
 async function fileText(file: string, place: Place): Promise<string> {
   const target = await realpath(place.path.resolve(place.cwd, file));
-  const located = locate({kind: 'file', path: target}, undefined, place);
+  const located = locate({kind: 'file', path: target}, place);
   if ('message' in located) throw new Error(`${file} links to another file. ${located.message}`);
   return readFile(target, 'utf8');
 }
@@ -36,11 +31,11 @@ async function textOf(input: Input, place: Place, stdin: Readable): Promise<stri
 
 /** Reads `run`'s input before any connection, so a bad input never starts the app. */
 export async function readDocument(
-  {input, lang}: RunInput,
+  input: Input,
   place: Place,
   stdin: Readable
 ): Promise<{document: TextDocument} | {failure: Failure}> {
-  const located = locate(input, lang, place);
+  const located = locate(input, place);
   if ('message' in located) return {failure: {code: 'usage', detail: located.message}};
   try {
     return {document: {...located, text: await textOf(input, place, stdin)}};

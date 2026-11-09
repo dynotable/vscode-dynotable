@@ -13,26 +13,26 @@ describe('locate', () => {
     ['q.opensearch', 'opensearch']
   ];
   it.each(files)('%s is %s', (file, languageId) => {
-    expect(locate({kind: 'file', path: file}, undefined, posix)).toEqual({
+    expect(locate({kind: 'file', path: file}, posix)).toEqual({
       uri: `file:///work/${file}`,
       languageId
     });
   });
 
   it('matches the name without regard to case', () => {
-    expect(locate({kind: 'file', path: 'Q.DTSQL'}, undefined, posix)).toMatchObject({
+    expect(locate({kind: 'file', path: 'Q.DTSQL'}, posix)).toMatchObject({
       languageId: 'sql'
     });
   });
 
   // A plain .sql file belongs to other SQL tools.
   it('refuses a plain .sql file', () => {
-    expect(locate({kind: 'file', path: 'q.sql'}, undefined, posix)).toHaveProperty('message');
+    expect(locate({kind: 'file', path: 'q.sql'}, posix)).toHaveProperty('message');
   });
 
   it('gives a Windows drive path a file:///C:/ URI', () => {
     const place = {cwd: 'C:\\work', path: path.win32};
-    expect(locate({kind: 'file', path: 'sub dir\\q.dtsql'}, undefined, place)).toEqual({
+    expect(locate({kind: 'file', path: 'sub dir\\q.dtsql'}, place)).toEqual({
       uri: 'file:///C:/work/sub%20dir/q.dtsql',
       languageId: 'sql'
     });

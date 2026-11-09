@@ -1,11 +1,11 @@
 import {chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
+import {dirname, join} from 'node:path';
 import {PassThrough} from 'node:stream';
 import {setTimeout as sleep} from 'node:timers/promises';
 import {pathToFileURL} from 'node:url';
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {REQUEST_FAILED, type WireError} from '../../../src/protocol';
+import {AUTH_FAILED, REQUEST_FAILED, type WireError} from '../../../src/protocol';
 import {frame, FrameReader, RpcFailure, type Id} from '../../../src/rpc';
 import {sink} from '../io';
 import {useHarness} from '../test-session';
@@ -277,6 +277,24 @@ describe('handshake and retry', () => {
     expect(editor.codes).toEqual([1]);
   });
 
+  // The retry ends without a second initialize: no port file, and the started app exits 1.
+  it('a retry that fails to start after an auth failure answers start-failed, not the old auth answer', async () => {
+    await h.fake.start();
+    const stub = join(h.cwd, 'dynotable');
+    writeFileSync(stub, '#!/bin/sh\nexit 1\n');
+    chmodSync(stub, 0o755);
+    h.fake.onInitialize = () => {
+      rmSync(h.portFile());
+      throw new RpcFailure({code: AUTH_FAILED, message: 'Invalid or missing token.'});
+    };
+    const editor = await connect({}, {env: {DYNOTABLE_APP_PATH: stub}, launch: true});
+    await editor.done;
+    expect(h.fake.initializeParams).toHaveLength(1);
+    expect(errorCodeOf(answerTo(editor, 1))).toBe('start-failed');
+    expect(JSON.parse(editor.stderr)).toMatchObject({code: 'start-failed'});
+    expect(editor.codes).toEqual([1]);
+  });
+
   it('a malformed .dynotable.json answers the initialize with an error and never connects', async () => {
     await h.fake.start();
     writeFileSync(join(h.cwd, '.dynotable.json'), '{not json');
@@ -364,8 +382,15 @@ describe('stdin and launch', () => {
     expect(editor.codes).toEqual([1]);
   });
 
-  it('--no-launch connects to an app that starts serving inside the wait', async () => {
-    const editor = startBridge({launch: false, awaitPortFileMs: 5000});
+  // DYNOTABLE_USER_DATA_DIR turns launching off as --no-launch does, so it waits too.
+  it.each<[string, () => Partial<BridgeOptions>]>([
+    ['--no-launch', () => ({launch: false})],
+    [
+      'DYNOTABLE_USER_DATA_DIR',
+      () => ({launch: true, env: {DYNOTABLE_USER_DATA_DIR: dirname(h.portFile())}})
+    ]
+  ])('%s connects to an app that starts serving inside the wait', async (_, options) => {
+    const editor = startBridge({...options(), awaitPortFileMs: 5000});
     // What the editor sends after initialize waits for the connection.
     editor.stdin.write(
       Buffer.concat([

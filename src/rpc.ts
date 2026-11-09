@@ -2,6 +2,7 @@ import type {Socket} from 'node:net';
 import {
   INTERNAL_ERROR,
   is,
+  isObject,
   METHOD_NOT_FOUND,
   responseErrorSchema,
   type WireError
@@ -96,14 +97,13 @@ const isId = (value: unknown): value is Id =>
 
 /** A request, a notification or a response; `undefined` for anything else. */
 export function parseMessage(body: Buffer): Message | undefined {
-  let value: unknown;
+  let message: unknown;
   try {
-    value = JSON.parse(body.toString('utf8'));
+    message = JSON.parse(body.toString('utf8'));
   } catch {
     return undefined;
   }
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
-  const message = value as Record<string, unknown>;
+  if (!isObject(message)) return undefined;
   if (typeof message.method === 'string') {
     return message.id === undefined || isId(message.id) ? message : undefined;
   }
