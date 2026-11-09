@@ -1,0 +1,13 @@
+{
+  "dynotable": {
+    "command": "dynotable-cli",
+    "args": ["lsp", "--no-launch"],
+    "extensionToLanguage": {
+      ".dtsql": "sql",
+      ".partiql": "partiql",
+      ".opensearch": "opensearch"
+    },
+    "startupTimeout": 75000,
+    "maxRestarts": 2
+  }
+}
