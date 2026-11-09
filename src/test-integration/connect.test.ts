@@ -103,6 +103,13 @@ describe('connect', () => {
     assert.ok(!fake.opened(plainUntitled.uri.toString()));
   });
 
+  // `.dtsql` is DynoTable's own extension: it needs no `sqlFiles` entry.
+  it('selectors: a .dtsql file is sql and gets didOpen', async () => {
+    const file = await openFile('orders.dtsql');
+    assert.equal(file.languageId, 'sql');
+    await waitFor('didOpen of the .dtsql file', () => fake.opened(file.uri.toString()));
+  });
+
   it('capabilities: initialize carries the three gating capabilities', async () => {
     await fresh();
     const params = (

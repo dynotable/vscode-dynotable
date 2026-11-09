@@ -53,15 +53,17 @@ You do this one time. After that, the extension starts DynoTable when it needs t
 
 | File              | Language                                 |
 | ----------------- | ---------------------------------------- |
+| `*.dtsql`         | DynoTable SQL (tables and indices)       |
 | `*.dynotable.sql` | DynoTable SQL (tables and indices)       |
 | `*.partiql`       | DynamoDB PartiQL                         |
 | `*.opensearch`    | One OpenSearch query: JSON DSL or Lucene |
 
-DynoTable does not attach to other `.sql` files. To attach one, open it and run
-**DynoTable: Attach SQL File**. The command adds the file to the `dynotable.sqlFiles` setting of
-its workspace folder. Each folder's own `dynotable.sqlFiles` decides which of its files attach. In a
-window with no folder, name the file `*.dynotable.sql`. In a window with folders, a `.sql` file
-outside them does not attach.
+A `*.dtsql` file always attaches. **DynoTable: New Query** creates one. DynoTable does not attach
+to other `.sql` files. To attach one, open it and run **DynoTable: Attach SQL File**. The command
+adds the file to the `dynotable.sqlFiles` setting of its workspace folder. Each folder's own
+`dynotable.sqlFiles` decides which of its `.sql` files attach. In a window with no folder, name the
+file `*.dtsql` or `*.dynotable.sql`. In a window with folders, a `.sql` file outside them does not
+attach.
 
 An OpenSearch query names its index on its first line:
 

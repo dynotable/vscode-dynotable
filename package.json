@@ -63,6 +63,12 @@
   "contributes": {
     "languages": [
       {
+        "id": "sql",
+        "extensions": [
+          ".dtsql"
+        ]
+      },
+      {
         "id": "partiql",
         "aliases": [
           "PartiQL"
