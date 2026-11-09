@@ -316,11 +316,11 @@ diagnostics and hover in `.dtsql`, `.partiql` and `.opensearch` files. It does n
 2. In Claude Code, add the marketplace and install the plugin:
 
    ```
-   /plugin marketplace add dynotable/vscode-dynotable
+   /plugin marketplace add dynotable/claude-plugins
    /plugin install dynotable@dynotable
    ```
 
-   From a shell: `claude plugin marketplace add dynotable/vscode-dynotable`, then
+   From a shell: `claude plugin marketplace add dynotable/claude-plugins`, then
    `claude plugin install dynotable@dynotable`.
 
 The plugin's language server does not start DynoTable. When DynoTable is not running, the server
