@@ -14,6 +14,27 @@ desktop app serves the language features and runs the queries.
 
 Full guide: [dynotable.com/docs/editors](https://dynotable.com/docs/editors).
 
+## Examples
+
+A SQL JOIN, in `orders.dynotable.sql`:
+
+```sql
+SELECT o.orderId, o.status, c.country FROM "orders" o JOIN "customers" c ON o.customerId = c.customerId
+```
+
+A DynamoDB PartiQL query, in `orders.partiql`:
+
+```sql
+SELECT * FROM "orders" WHERE customerId = 'CUST010'
+```
+
+An OpenSearch query DSL search, in `orders.opensearch`. The first line names the index:
+
+```
+// dynotable: index=orders
+{"query": {"match": {"status": "shipped"}}}
+```
+
 ## Requirements
 
 - The DynoTable desktop app, version 1.19.0 or later, installed on the same computer.
