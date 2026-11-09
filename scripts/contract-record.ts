@@ -6,7 +6,8 @@
  *   pnpm contract:record --profile <id|slug> --table <name> --large-table <name> --index <name>
  *     --set-table <name> --sql <a SELECT that names its columns>
  *     --projection-sql <a SELECT that names Set columns>
- *     --key-sql <a SELECT * whose WHERE bounds the partition key> [--user-data-dir <dir>]
+ *     --key-sql <a SELECT * whose WHERE bounds the partition key>
+ *     --hidden-profile <id|slug of a profile not available to agents> [--user-data-dir <dir>]
  *   pnpm contract:check  (same options)
  */
 import {readFileSync, writeFileSync} from 'node:fs';
@@ -41,6 +42,8 @@ interface Options {
   projectionSql: string;
   /** Plans as a Query, so the run takes the server's key-read route, not a Scan. */
   keySql: string;
+  /** A profile in the roster that is not available to agents. */
+  hiddenProfile: string;
   userDataDir: string | undefined;
 }
 
@@ -61,7 +64,7 @@ function open(port: number): Promise<Peer> {
   });
 }
 
-async function session(file: PortFile, profile?: string): Promise<Session> {
+async function session(file: PortFile, profile?: string, purpose?: 'agent'): Promise<Session> {
   const peer = await open(file.port);
   const notifications: Session['notifications'] = [];
   peer.onNotification = (method, params) => notifications.push({method, params});
@@ -76,7 +79,11 @@ async function session(file: PortFile, profile?: string): Promise<Session> {
     processId: process.pid,
     rootUri: null,
     capabilities: CAPABILITIES,
-    initializationOptions: {token: file.token, ...(profile ? {profile} : {})}
+    initializationOptions: {
+      token: file.token,
+      ...(profile ? {profile} : {}),
+      ...(purpose ? {purpose} : {})
+    }
   }).response;
   peer.notify('initialized', {});
   return {peer, result, notifications};
@@ -151,6 +158,16 @@ async function capture(file: PortFile, options: Options): Promise<Map<string, un
     )
   );
   await close(unbound);
+
+  const agent = await session(file, options.hiddenProfile, 'agent');
+  out.set(
+    'error-profile-not-exposed.json',
+    await refusal(
+      agent.peer.request('dynotable/listTables', {}).response,
+      `profile "${options.hiddenProfile}" is in the roster and not available to agents`
+    )
+  );
+  await close(agent);
 
   const bound = await session(file, options.profile);
   const {peer} = bound;
@@ -394,6 +411,7 @@ async function main(): Promise<void> {
       sql: {type: 'string'},
       'projection-sql': {type: 'string'},
       'key-sql': {type: 'string'},
+      'hidden-profile': {type: 'string'},
       'user-data-dir': {type: 'string'}
     }
   });
@@ -408,6 +426,7 @@ async function main(): Promise<void> {
     sql: values.sql ?? fail('--sql is required'),
     projectionSql: values['projection-sql'] ?? fail('--projection-sql is required'),
     keySql: values['key-sql'] ?? fail('--key-sql is required'),
+    hiddenProfile: values['hidden-profile'] ?? fail('--hidden-profile is required'),
     userDataDir: values['user-data-dir']
   };
   const platform = currentPlatform();

@@ -25,6 +25,7 @@ Preconditions:
   arrives, and a table whose items hold string, number and binary Sets, also inside a map;
 - OpenSearch with one seeded index;
 - more than one profile in the roster, and no app window open on the profile under test;
+- a profile that is not available to agents. It can be the profile under test;
 - an active or trial licence.
 
 Steps:
@@ -38,7 +39,8 @@ Steps:
      --large-table <large table> --set-table <table with Sets> --index <index> \
      --sql '<a SELECT that names its columns>' \
      --projection-sql '<a SELECT that names Set columns of the Set table>' \
-     --key-sql '<a SELECT * whose WHERE sets the partition key of the table>'
+     --key-sql '<a SELECT * whose WHERE sets the partition key of the table>' \
+     --hidden-profile <id|slug of the profile that is not available to agents>
    ```
 
 2. Run `pnpm gate` on the new fixtures.

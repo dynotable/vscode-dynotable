@@ -1,9 +1,7 @@
 import {HELP, parse} from './args';
 import {EXIT, sink} from './io';
-
-/** Stamped by the build. */
-declare const DYNOTABLE_CLI_VERSION: string | undefined;
-const VERSION = typeof DYNOTABLE_CLI_VERSION === 'string' ? DYNOTABLE_CLI_VERSION : '0.0.0-dev';
+import {emit} from './output';
+import {CLI_VERSION} from './version';
 
 const io = sink({
   stdin: process.stdin,
@@ -21,17 +19,13 @@ switch (invocation.kind) {
     io.exit(EXIT.ok);
     break;
   case 'version':
-    io.out(`${VERSION}\n`);
+    io.out(`${CLI_VERSION}\n`);
     io.exit(EXIT.ok);
     break;
   case 'usage':
-    io.err(`${JSON.stringify({code: 'usage', message: invocation.message})}\n`);
-    io.exit(EXIT.usage);
+    emit(io, {failure: {code: 'usage', detail: invocation.message}});
     break;
   case 'command':
-    io.err(
-      `${JSON.stringify({code: 'usage', message: `${invocation.command} is not in this build.`})}\n`
-    );
-    io.exit(EXIT.usage);
+    emit(io, {failure: {code: 'usage', detail: `${invocation.command} is not in this build.`}});
     break;
 }
