@@ -1,7 +1,10 @@
+import {homedir} from 'node:os';
 import {HELP, parse} from './args';
+import {list} from './commands/listing';
 import {EXIT, sink} from './io';
 import {emit} from './output';
-import {CLI_VERSION} from './version';
+import {createSession} from './session';
+import {CLI_VERSION, minAppVersion} from './version';
 
 const io = sink({
   stdin: process.stdin,
@@ -25,7 +28,24 @@ switch (invocation.kind) {
   case 'usage':
     emit(io, {failure: {code: 'usage', detail: invocation.message}});
     break;
-  case 'command':
-    emit(io, {failure: {code: 'usage', detail: `${invocation.command} is not in this build.`}});
+  case 'command': {
+    const {command} = invocation;
+    if (command === 'profiles' || command === 'tables' || command === 'indices') {
+      const session = createSession({
+        minAppVersion,
+        env: process.env,
+        home: homedir(),
+        io,
+        launch: invocation.launch,
+        cwd: process.cwd(),
+        ...(invocation.profile === undefined ? {} : {profile: invocation.profile})
+      });
+      void session.run(list(command));
+    } else {
+      emit(io, {
+        failure: {code: 'usage', detail: `${command} is not in this build.`}
+      });
+    }
     break;
+  }
 }
