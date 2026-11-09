@@ -1,6 +1,7 @@
 import {homedir} from 'node:os';
 import path from 'node:path';
-import {HELP, parse, type Command} from './args';
+import {HELP, parse, type Command, type Subcommand} from './args';
+import {AWAIT_PORT_FILE_MS, createBridge} from './commands/lsp-bridge';
 import {list} from './commands/listing';
 import {readDocument, run, type RunInput} from './commands/run';
 import {EXIT, sink} from './io';
@@ -17,7 +18,7 @@ const io = sink({
   }
 });
 
-let session: CliSession | undefined;
+let session: Pick<CliSession, 'stop'> | undefined;
 let interrupted = false;
 process.on('SIGINT', () => {
   if (interrupted) return;
@@ -27,6 +28,8 @@ process.on('SIGINT', () => {
   io.stdin.destroy();
   void session?.stop();
 });
+// The editor or the reader of the output is gone: end as when stdin closes.
+process.stdout.on('error', () => io.stdin.destroy());
 
 const invocation = parse(process.argv0, process.argv.slice(2));
 switch (invocation.kind) {
@@ -47,10 +50,7 @@ switch (invocation.kind) {
 }
 
 async function start(given: Command): Promise<void> {
-  const work = await workOf(given);
-  // A bad input, or a SIGINT during the stdin read, ended the command.
-  if (!work || io.finished) return;
-  session = createSession({
+  const common = {
     minAppVersion,
     env: process.env,
     home: homedir(),
@@ -58,16 +58,31 @@ async function start(given: Command): Promise<void> {
     launch: given.launch,
     cwd: process.cwd(),
     ...(given.profile === undefined ? {} : {profile: given.profile})
-  });
-  await session.run(work);
+  };
+  if (given.command === 'lsp') {
+    const bridge = createBridge({
+      ...common,
+      agent: given.agent,
+      awaitPortFileMs: AWAIT_PORT_FILE_MS
+    });
+    session = bridge;
+    await bridge.run();
+    return;
+  }
+  const work = await workOf(given.command, given);
+  // A bad input, or a SIGINT during the stdin read, ended the command.
+  if (!work || io.finished) return;
+  const oneShot = createSession(common);
+  session = oneShot;
+  await oneShot.run(work);
 }
 
-async function workOf(given: Command) {
-  switch (given.command) {
+async function workOf(command: Exclude<Subcommand, 'lsp'>, given: Command) {
+  switch (command) {
     case 'profiles':
     case 'tables':
     case 'indices':
-      return list(given.command);
+      return list(command);
     case 'run': {
       // parse() gives every run an input.
       const read = await readDocument(given as RunInput, {cwd: process.cwd(), path}, io.stdin);
@@ -75,8 +90,5 @@ async function workOf(given: Command) {
       emit(io, read);
       return undefined;
     }
-    case 'lsp':
-      emit(io, {failure: {code: 'usage', detail: `${given.command} is not in this build.`}});
-      return undefined;
   }
 }

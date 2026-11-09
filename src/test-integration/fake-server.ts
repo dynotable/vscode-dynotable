@@ -61,10 +61,13 @@ export class FakeServer {
   /** Keeps a start in flight this long before `initialize` is answered. */
   initializeDelayMs = 0;
   /**
-   * Runs before each `initialize` is checked; a test can rotate the token here. It can throw an
-   * `RpcFailure` to refuse: with `-32898`, the socket drops as after a wrong token.
+   * Runs before each `initialize` is checked; a test can rotate the token here, or send the
+   * session a message that then arrives before the answer. It can throw an `RpcFailure` to refuse:
+   * with `-32898`, the socket drops as after a wrong token.
    */
-  onInitialize: (() => void) | undefined;
+  onInitialize: ((session: Session) => void) | undefined;
+  /** Resets each connection as soon as it is accepted. */
+  resetOnAccept = false;
   /**
    * The ids and slugs of the profiles available to agents. While it is set, an agent session
    * lists only those rows and binds only one of them.
@@ -134,6 +137,11 @@ export class FakeServer {
     for (const session of this.sessions) session.peer.socket.destroy();
   }
 
+  /** Writes `bytes` as they are to every initialized session, past the framing of `Peer`. */
+  writeRaw(bytes: Buffer): void {
+    for (const session of this.initializedSessions()) session.peer.socket.write(bytes);
+  }
+
   notifyAll(method: string, params: unknown): void {
     for (const session of this.initializedSessions()) session.peer.notify(method, params);
   }
@@ -173,6 +181,10 @@ export class FakeServer {
   }
 
   private accept(socket: Socket): void {
+    if (this.resetOnAccept) {
+      socket.resetAndDestroy();
+      return;
+    }
     const session: Session = {peer: new Peer(socket), initialized: false, held: new Map()};
     this.sessions.add(session);
     socket.on('close', () => this.sessions.delete(session));
@@ -189,7 +201,7 @@ export class FakeServer {
     if (method === 'initialize') {
       this.initializeParams.push(params);
       try {
-        this.onInitialize?.();
+        this.onInitialize?.(session);
       } catch (error) {
         if (error instanceof RpcFailure && error.error.code === AUTH_FAILED) {
           setTimeout(() => session.peer.socket.destroy(), AUTH_DROP_MS);

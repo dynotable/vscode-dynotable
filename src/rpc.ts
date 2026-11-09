@@ -45,11 +45,12 @@ export class FrameReader {
   private buffer = Buffer.alloc(0);
   private error: string | undefined;
 
-  push(chunk: Buffer): Frames {
+  /** Reads at most `limit` frames; the rest stays in `remainder`, byte for byte. */
+  push(chunk: Buffer, limit = Infinity): Frames {
     if (this.error) return {bodies: [], error: this.error};
     this.buffer = Buffer.concat([this.buffer, chunk]);
     const bodies: Buffer[] = [];
-    for (;;) {
+    while (bodies.length < limit) {
       const end = this.buffer.indexOf(HEADER_END);
       if (end < 0) return {bodies};
       const length = contentLength(this.buffer.subarray(0, end).toString('ascii'));
@@ -62,9 +63,10 @@ export class FrameReader {
       bodies.push(this.buffer.subarray(start, start + length));
       this.buffer = this.buffer.subarray(start + length);
     }
+    return {bodies};
   }
 
-  /** The bytes after the last complete frame. */
+  /** The bytes after the last frame read. */
   get remainder(): Buffer {
     return this.buffer;
   }
@@ -81,7 +83,7 @@ function contentLength(header: string): number | undefined {
   return undefined;
 }
 
-interface Message {
+export interface Message {
   id?: Id;
   method?: string;
   params?: unknown;
@@ -93,7 +95,7 @@ const isId = (value: unknown): value is Id =>
   typeof value === 'number' || typeof value === 'string';
 
 /** A request, a notification or a response; `undefined` for anything else. */
-function parseMessage(body: Buffer): Message | undefined {
+export function parseMessage(body: Buffer): Message | undefined {
   let value: unknown;
   try {
     value = JSON.parse(body.toString('utf8'));

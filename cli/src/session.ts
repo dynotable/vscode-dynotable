@@ -21,7 +21,8 @@ import {
   failureCodeOf,
   initializeResultSchema,
   is,
-  type Schema
+  type Schema,
+  type WireError
 } from '../../src/protocol';
 import {Peer, RpcFailure} from '../../src/rpc';
 import {readDotfile} from './dotfile';
@@ -30,19 +31,25 @@ import {codeOfError} from './messages';
 import {emit, type Failure, type Result} from './output';
 import {CLI_VERSION} from './version';
 
-export interface SessionOptions {
+/** What every command's `ConnectCore` is built from. */
+export interface CoreOptions {
   minAppVersion: string;
   env: Env;
   /** Feeds the default user data directory. */
   home: string;
-  io: Sink;
   /** False under `--no-launch`. */
   launch: boolean;
+  platform?: Platform;
+  /** See `CoreSeams.awaitPortFileMs`. */
+  awaitPortFileMs?: number;
+}
+
+export interface SessionOptions extends CoreOptions {
+  io: Sink;
   /** Where `.dynotable.json` is read when no `profile` is given. */
   cwd: string;
   /** `--profile`. */
   profile?: string;
-  platform?: Platform;
 }
 
 export type Answer<T> = {ok: true; value: T} | {ok: false; failure: Failure};
@@ -77,12 +84,51 @@ const connection = (peer: Peer): Connection => ({
   notify: (method, params) => peer.notify(method, params)
 });
 
-/** An agent session over `ConnectCore`. `ConnectCore` owns the retry, the launch and the floor. */
-export function createSession(options: SessionOptions): CliSession {
-  const {env, home, io} = options;
+/**
+ * A `ConnectCore` on the real process. It reads `DYNOTABLE_APP_PATH` and `DYNOTABLE_USER_DATA_DIR`;
+ * the second one turns launching off.
+ */
+export function createCore(
+  options: CoreOptions,
+  startSession: (params: StartParams) => StartHandle
+): ConnectCore {
+  const {env, home} = options;
   const platform = options.platform ?? currentPlatform();
   const customUserData = env.DYNOTABLE_USER_DATA_DIR || undefined;
   const portFile = portFilePath(platform, customUserData ?? userDataDir(platform, env, home));
+  return new ConnectCore({
+    platform,
+    home,
+    env,
+    minAppVersion: options.minAppVersion,
+    launcherOff: () => customUserData !== undefined || !options.launch,
+    ...(options.awaitPortFileMs === undefined ? {} : {awaitPortFileMs: options.awaitPortFileMs}),
+    readPortFile: () => readPortFile(fs, portFile),
+    kill: (pid, signal) => process.kill(pid, signal),
+    connect: connectTcp,
+    locateApp: () => locateApp(fs, {platform, env, home, appPath: env.DYNOTABLE_APP_PATH ?? ''}),
+    spawn: (command, args, spawnOptions) => spawn(command, args, spawnOptions),
+    startSession,
+    onState: () => {}
+  });
+}
+
+/** The outcome of an `initialize` answered with a result. */
+export const okOutcome = (result: unknown): StartOutcome => ({
+  kind: 'ok',
+  version: is(initializeResultSchema, result) ? result.serverInfo.version : undefined
+});
+
+/** The outcome of an `initialize` answered with an error. */
+export function refusedOutcome(error: WireError): StartOutcome {
+  if (error.code === AUTH_FAILED) return {kind: 'auth-failed'};
+  if (failureCodeOf(error) === 'signed-out') return {kind: 'signed-out'};
+  return {kind: 'refused'};
+}
+
+/** An agent session over `ConnectCore`. `ConnectCore` owns the retry, the launch and the floor. */
+export function createSession(options: SessionOptions): CliSession {
+  const {io} = options;
   const peers = new Map<number, Peer>();
   let profile = options.profile;
 
@@ -105,17 +151,10 @@ export function createSession(options: SessionOptions): CliSession {
       .response.then(
         (result): StartOutcome => {
           peer.notify('initialized', {});
-          const version = is(initializeResultSchema, result)
-            ? result.serverInfo.version
-            : undefined;
-          return {kind: 'ok', version};
+          return okOutcome(result);
         },
-        (error: unknown): StartOutcome => {
-          if (!(error instanceof RpcFailure)) return {kind: 'closed'};
-          if (error.error.code === AUTH_FAILED) return {kind: 'auth-failed'};
-          if (failureCodeOf(error.error) === 'signed-out') return {kind: 'signed-out'};
-          return {kind: 'refused'};
-        }
+        (error: unknown): StartOutcome =>
+          error instanceof RpcFailure ? refusedOutcome(error.error) : {kind: 'closed'}
       );
     return {
       outcome,
@@ -126,20 +165,7 @@ export function createSession(options: SessionOptions): CliSession {
     };
   };
 
-  const core = new ConnectCore({
-    platform,
-    home,
-    env,
-    minAppVersion: options.minAppVersion,
-    launcherOff: () => customUserData !== undefined || !options.launch,
-    readPortFile: () => readPortFile(fs, portFile),
-    kill: (pid, signal) => process.kill(pid, signal),
-    connect: connectTcp,
-    locateApp: () => locateApp(fs, {platform, env, home, appPath: env.DYNOTABLE_APP_PATH ?? ''}),
-    spawn: (command, args, spawnOptions) => spawn(command, args, spawnOptions),
-    startSession: start,
-    onState: () => {}
-  });
+  const core = createCore(options, start);
 
   async function close(peer: Peer): Promise<void> {
     // A closed peer rejects at once.

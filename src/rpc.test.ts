@@ -24,6 +24,15 @@ describe('FrameReader', () => {
     expect(reader.remainder.toString('ascii')).toBe('Cont');
   });
 
+  // The bridge forwards the bytes after the editor's initialize as they came.
+  it('with a limit, keeps the later frames in the remainder byte for byte', () => {
+    const second = Buffer.from('Content-Type: x\r\nContent-Length: 7\r\n\r\n{"b":2}');
+    const reader = new FrameReader();
+    const {bodies} = reader.push(Buffer.concat([frame(bytes('{"a":1}')), second]), 1);
+    expect(texts(bodies)).toEqual(['{"a":1}']);
+    expect(reader.remainder).toEqual(second);
+  });
+
   // A length counted in characters would cut the body short, and the next frame would not parse.
   it('counts Content-Length in bytes, across a split inside a multi-byte character', () => {
     const body = '{"name":"Zoë €😀"}';

@@ -16,6 +16,11 @@ export interface Result {
 const exitOf = (code: ErrorCode) =>
   code === 'usage' ? EXIT.usage : code === 'interrupted' ? EXIT.interrupted : EXIT.failure;
 
+/** The stderr line of a failure. */
+export function failureLine({code, detail}: Failure): string {
+  return `${JSON.stringify({code, message: messageOf(code), ...(detail ? {detail} : {})})}\n`;
+}
+
 /** Writes, then sets the exit code. */
 export function emit(io: Sink, {value, failure}: Result): void {
   if (value !== undefined) io.out(`${JSON.stringify(value)}\n`);
@@ -23,7 +28,6 @@ export function emit(io: Sink, {value, failure}: Result): void {
     io.exit(EXIT.ok);
     return;
   }
-  const {code, detail} = failure;
-  io.err(`${JSON.stringify({code, message: messageOf(code), ...(detail ? {detail} : {})})}\n`);
-  io.exit(exitOf(code));
+  io.err(failureLine(failure));
+  io.exit(exitOf(failure.code));
 }
