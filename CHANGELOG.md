@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0 — 2026-11-09
+
+- `*.dtsql` files are DynoTable SQL files. They attach without a `dynotable.sqlFiles` entry, and
+  New Query creates them. `*.dynotable.sql` files still work.
+- This repository now also holds `dynotable-cli`, a command line client for AI agents and other
+  editors, and a Claude Code plugin. See the README. They need DynoTable 1.20.0 or later; the
+  extension still works with 1.19.0.
+
 ## 0.1.3 — 2026-11-09
 
 - The README shows a SQL JOIN, a PartiQL query and an OpenSearch query.

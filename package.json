@@ -3,7 +3,7 @@
   "displayName": "DynoTable – DynamoDB & OpenSearch SQL",
   "icon": "media/icon.png",
   "description": "SQL and PartiQL for DynamoDB, SQL and query DSL for OpenSearch, and SQL joins across both. Requires the DynoTable desktop app.",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "publisher": "dynotable",
   "license": "MIT",
   "repository": {
