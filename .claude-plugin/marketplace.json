@@ -1,0 +1,15 @@
+{
+  "name": "dynotable",
+  "description": "DynoTable plugins for Claude Code.",
+  "owner": {
+    "name": "DynoTable",
+    "url": "https://dynotable.com"
+  },
+  "plugins": [
+    {
+      "name": "dynotable",
+      "source": "./claude-plugin",
+      "description": "Read DynamoDB and OpenSearch through the DynoTable desktop app with the dynotable-cli command."
+    }
+  ]
+}

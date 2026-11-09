@@ -3,7 +3,7 @@ import {writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {after, before, describe, it} from 'mocha';
 import * as vscode from 'vscode';
-import {RpcFailure} from '../../scripts/rpc';
+import {RpcFailure} from '../rpc';
 import type {WireError} from '../protocol';
 import {REASONS} from '../reasons';
 import {

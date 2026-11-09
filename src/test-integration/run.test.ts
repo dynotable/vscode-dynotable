@@ -1,7 +1,7 @@
 import {strict as assert} from 'node:assert';
 import {after, before, beforeEach, describe, it} from 'mocha';
 import * as vscode from 'vscode';
-import {RpcFailure, type Id} from '../../scripts/rpc';
+import {RpcFailure, type Id} from '../rpc';
 import type {CommandArgs, Range, WireError} from '../protocol';
 import {
   api,

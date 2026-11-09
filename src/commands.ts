@@ -185,9 +185,9 @@ export async function selectProfile(deps: CommandDeps): Promise<void> {
   await deps.requestProfile({id: item.profile.id, name: item.profile.name});
 }
 
-/** Untitled `sql` attaches only under a `.dynotable.sql` path. */
+/** Untitled `sql` attaches only under a `.dtsql` or `.dynotable.sql` path. */
 const SUFFIXES: Record<Query['language'], string> = {
-  sql: '.dynotable.sql',
+  sql: '.dtsql',
   partiql: '.partiql',
   opensearch: '.opensearch'
 };
@@ -232,7 +232,7 @@ export async function attachSqlFile(deps: CommandDeps): Promise<void> {
     void vscode.window.showInformationMessage(
       vscode.workspace.workspaceFolders
         ? 'Only a file in an open workspace folder can be attached.'
-        : 'Only a file in an open workspace folder can be attached. Outside a folder, name the file *.dynotable.sql.'
+        : 'Only a file in an open workspace folder can be attached. Outside a folder, name the file *.dtsql or *.dynotable.sql.'
     );
     return;
   }

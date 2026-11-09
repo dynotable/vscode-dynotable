@@ -5,7 +5,7 @@ import {join} from 'node:path';
 import {after, before, describe, it} from 'mocha';
 import * as vscode from 'vscode';
 import {LanguageClient} from 'vscode-languageclient/node';
-import {RpcFailure} from '../../scripts/rpc';
+import {RpcFailure} from '../rpc';
 import {REASONS} from '../reasons';
 import {
   api,
@@ -101,6 +101,13 @@ describe('connect', () => {
     await waitFor('didOpen of the New query buffer', () => fake.opened(query.uri.toString()));
     assert.ok(!fake.opened(outside.uri.toString()));
     assert.ok(!fake.opened(plainUntitled.uri.toString()));
+  });
+
+  // `.dtsql` is DynoTable's own extension: it needs no `sqlFiles` entry.
+  it('selectors: a .dtsql file is sql and gets didOpen', async () => {
+    const file = await openFile('orders.dtsql');
+    assert.equal(file.languageId, 'sql');
+    await waitFor('didOpen of the .dtsql file', () => fake.opened(file.uri.toString()));
   });
 
   it('capabilities: initialize carries the three gating capabilities', async () => {

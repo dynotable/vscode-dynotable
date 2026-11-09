@@ -63,6 +63,12 @@
   "contributes": {
     "languages": [
       {
+        "id": "sql",
+        "extensions": [
+          ".dtsql"
+        ]
+      },
+      {
         "id": "partiql",
         "aliases": [
           "PartiQL"
@@ -222,7 +228,7 @@
   "scripts": {
     "build": "node esbuild.mjs",
     "vscode:prepublish": "node esbuild.mjs --production",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p media",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p media && tsc --noEmit -p cli",
     "lint": "oxlint && oxfmt --check",
     "format": "oxfmt",
     "test": "vitest run",
@@ -235,7 +241,10 @@
     "contract:record": "pnpm build:tests && node out/scripts/contract-record.js record",
     "contract:check": "pnpm build:tests && node out/scripts/contract-record.js check",
     "package": "vsce package --no-dependencies",
-    "gate": "pnpm typecheck && pnpm lint && pnpm test && pnpm test:integration && pnpm package"
+    "cli:build": "node cli/scripts/build.mjs",
+    "cli:build:all": "node cli/scripts/build.mjs --all",
+    "cli:binary": "vitest run --config cli/vitest.binary.config.mts",
+    "gate": "pnpm typecheck && pnpm lint && pnpm test && pnpm test:integration && pnpm cli:build && pnpm cli:binary && pnpm package"
   },
   "dependencies": {
     "semver": "^7.8.5",

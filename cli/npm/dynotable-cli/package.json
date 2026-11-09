@@ -1,0 +1,41 @@
+{
+  "name": "dynotable-cli",
+  "version": "0.1.0",
+  "description": "Query DynamoDB and OpenSearch through the DynoTable app from the command line, and bridge editors to its language server. Requires the DynoTable desktop app.",
+  "license": "MIT",
+  "homepage": "https://dynotable.com/docs/editors",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dynotable/vscode-dynotable.git",
+    "directory": "cli/npm/dynotable-cli"
+  },
+  "bugs": {
+    "url": "https://github.com/dynotable/vscode-dynotable/issues"
+  },
+  "keywords": [
+    "dynamodb",
+    "opensearch",
+    "sql",
+    "partiql",
+    "cli",
+    "lsp",
+    "language server"
+  ],
+  "type": "module",
+  "bin": {
+    "dynotable-cli": "bin/dynotable-cli.mjs",
+    "dynotable-lsp": "bin/dynotable-lsp.mjs"
+  },
+  "files": [
+    "bin/*.mjs",
+    "lib/*.mjs"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "@dynotable/cli-darwin-arm64": "0.1.0",
+    "@dynotable/cli-linux-x64": "0.1.0",
+    "@dynotable/cli-win-x64": "0.1.0"
+  }
+}

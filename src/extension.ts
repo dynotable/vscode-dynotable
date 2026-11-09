@@ -1,8 +1,7 @@
 import {spawn} from 'node:child_process';
-import {readdirSync, readFileSync, statSync, watch, type FSWatcher} from 'node:fs';
-import {connect, type Socket} from 'node:net';
+import {readFileSync} from 'node:fs';
 import {homedir} from 'node:os';
-import {basename, dirname, join} from 'node:path';
+import {join} from 'node:path';
 import * as vscode from 'vscode';
 import type {LanguageClient} from 'vscode-languageclient/node';
 import {
@@ -32,11 +31,11 @@ import {
   portFilePath,
   readPortFile,
   userDataDir,
-  type ExtensionMode,
-  type Fs
+  type ExtensionMode
 } from './discovery';
 import {Explorer} from './explorer';
 import type {Node} from './explorer-model';
+import {connectTcp, fs, watchPortFile} from './node-seams';
 import type {RequestedProfile} from './profiles';
 import {listTablesSchema} from './protocol';
 import {REASONS, type Action} from './reasons';
@@ -84,61 +83,11 @@ const MODES: Record<vscode.ExtensionMode, ExtensionMode> = {
 const PROFILE_KEY = 'dynotable.profile';
 const DOWNLOAD_URL = 'https://dynotable.com/download';
 const DOCS_URL = 'https://dynotable.com/docs/editors';
-/** How often to look for the userData directory while it does not exist. */
-const DIRECTORY_POLL_MS = 2000;
 
 /** A test that reaches a real process launch or browser open fails here instead. */
 const refuse = (name: string) => () => {
   throw new Error(`${name} is disabled in tests; replace the seam`);
 };
-
-const fs: Fs = {
-  readFile: (path) => readFileSync(path, 'utf8'),
-  readdir: (path) => readdirSync(path),
-  isFile: (path) => statSync(path, {throwIfNoEntry: false})?.isFile() ?? false
-};
-
-const connectTcp = (port: number) =>
-  new Promise<Socket>((resolve, reject) => {
-    const socket = connect(port, '127.0.0.1');
-    socket.once('error', reject);
-    socket.once('connect', () => {
-      socket.off('error', reject);
-      resolve(socket);
-    });
-  });
-
-/**
- * Watches the port file's directory, because an atomic rename replaces the file's inode. While the
- * directory does not exist, it polls for it.
- */
-function watchPortFile(path: string, changed: () => void): vscode.Disposable {
-  let watcher: FSWatcher | undefined;
-  const arm = () => {
-    try {
-      watcher = watch(dirname(path), (_event, file) => {
-        if (!file || file === basename(path)) changed();
-      });
-      watcher.on('error', () => {
-        watcher?.close();
-        watcher = undefined;
-      });
-      return true;
-    } catch {
-      return false;
-    }
-  };
-  arm();
-  const poll = setInterval(() => {
-    if (!watcher && arm()) changed();
-  }, DIRECTORY_POLL_MS);
-  return {
-    dispose: () => {
-      clearInterval(poll);
-      watcher?.close();
-    }
-  };
-}
 
 /** Read at each use, so a changed setting applies without a window reload. */
 const setting = (name: 'userDataDir' | 'appPath') =>
