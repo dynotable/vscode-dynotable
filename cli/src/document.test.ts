@@ -19,6 +19,12 @@ describe('locate', () => {
     });
   });
 
+  it('matches the name without regard to case', () => {
+    expect(locate({kind: 'file', path: 'Q.DTSQL'}, undefined, posix)).toMatchObject({
+      languageId: 'sql'
+    });
+  });
+
   // A plain .sql file belongs to other SQL tools.
   it('refuses a plain .sql file', () => {
     expect(locate({kind: 'file', path: 'q.sql'}, undefined, posix)).toHaveProperty('message');

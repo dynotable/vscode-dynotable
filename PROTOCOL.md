@@ -92,8 +92,9 @@ Rules:
   when that fails too.
 - `initialize` can also fail with `-32803` and `data.code: "signed-out"`.
 - `purpose: "agent"` opens an [agent session](#agent-sessions). Any other value, or no value, opens
-  an editor session. A bad value does not fail `initialize`. An older app ignores `purpose` and opens
-  an editor session, so a client that must not get an editor session checks `serverInfo.version`.
+  an editor session. A bad value does not fail `initialize`. The first app release that honours
+  `purpose` is 1.20.0. An older app ignores it and opens an editor session, so a client that must
+  not get an editor session checks `serverInfo.version`.
 - A second `initialize` on one connection is refused. To change the profile, open a new connection.
 - `shutdown` and `exit` end that connection only. The app keeps serving.
 
@@ -311,7 +312,9 @@ line tool that an AI agent runs. It can do less than an editor session:
 - **Data requests are recorded.** `dynotable.runStatement`, `dynotable/listTables` and
   `dynotable/listIndices` each write one entry in the bound profile's audit log in the app. The
   entry holds the statement and the outcome, not the rows. When the app cannot write the entry, the
-  request fails with `run-failed` and returns no data.
+  request fails with `run-failed` and returns no data. No other request writes an entry:
+  `dynotable/listProfiles`, completion, diagnostics and code actions are not recorded, and they can
+  name tables and indices of the bound profile.
 - **Completion gives keywords and field names only.** It gives no stored sample values and no
   values from an index. `completionItem/resolve` adds no sample values.
 - **Refused commands.** `dynotable.openInApp`, `dynotable.validateQuery` and any unknown command fail

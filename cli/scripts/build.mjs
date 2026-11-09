@@ -5,7 +5,8 @@
 //                                     and its archive (pnpm cli:build:all)
 //
 // --min-app-version <x.y.z> overrides the app version floor, for the dev live lane. A release
-// build refuses a floor lower than CLI_MIN_APP_VERSION.
+// build refuses a floor lower than CLI_MIN_APP_VERSION; a host build with it stamps a private
+// platform package, so npm refuses to publish it.
 import {spawnSync} from 'node:child_process';
 import {
   copyFileSync,
@@ -153,7 +154,11 @@ function stamp(target, out) {
     .replaceAll('{{cpu}}', target.arch);
   if (manifest.includes('{{')) fail('platform.package.json has a placeholder that is not stamped.');
   if (JSON.parse(manifest).name !== packageOf(target)) fail('platform package name drift.');
-  writeFileSync(path.join(out, 'package.json'), manifest);
+  const lowered = !release && override !== undefined;
+  writeFileSync(
+    path.join(out, 'package.json'),
+    lowered ? `${JSON.stringify({...JSON.parse(manifest), private: true}, null, 2)}\n` : manifest
+  );
   copyFileSync(license, path.join(out, 'LICENSE'));
 }
 

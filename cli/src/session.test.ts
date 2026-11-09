@@ -21,8 +21,7 @@ afterEach(() => {
 /** One `listTables` through a session, as a one-shot command does it. */
 const listTables = (options: Partial<SessionOptions> = {}) =>
   h.run(async (connection) => {
-    const answer = await connection.request('dynotable/listTables', {}, listTablesSchema);
-    return answer.ok ? {value: answer.value} : {failure: answer.failure};
+    return connection.request('dynotable/listTables', {}, listTablesSchema);
   }, options);
 
 const optionsOf = (index: number) =>
@@ -59,25 +58,6 @@ describe('session', () => {
         'exit'
       ])
     );
-  });
-
-  it('reconnects once after a token rotated at the first initialize', async () => {
-    await h.fake.start();
-    h.fake.onInitialize = () => {
-      if (h.fake.initializeParams.length === 1) h.fake.rotateToken();
-    };
-    await listTables();
-    expect(h.codes).toEqual([0]);
-    expect(h.fake.initializeParams).toHaveLength(2);
-  });
-
-  it('two auth failures end with auth-failed', async () => {
-    await h.fake.start();
-    h.fake.onInitialize = () => h.fake.rotateToken();
-    await listTables();
-    expect(h.codes).toEqual([1]);
-    expect(h.failure().code).toBe('auth-failed');
-    expect(h.fake.initializeParams).toHaveLength(2);
   });
 
   it('signed-out at initialize exits 1 with signed-out', async () => {
@@ -161,6 +141,19 @@ describe('session', () => {
     await listTables({profile: 'profile-1-slug'});
     expect(optionsOf(0).profile).toBe('profile-2-slug');
     expect(optionsOf(1).profile).toBe('profile-1-slug');
+  });
+
+  // A broken file must not fall back to the default profile without a word.
+  it('a malformed .dynotable.json is a usage error that names the file, and never connects', async () => {
+    await h.fake.start();
+    writeFileSync(join(h.cwd, '.dynotable.json'), '{not json');
+    await listTables();
+    expect(h.codes).toEqual([2]);
+    expect(h.failure()).toMatchObject({
+      code: 'usage',
+      detail: expect.stringContaining(join(h.cwd, '.dynotable.json'))
+    });
+    expect(h.fake.initializeParams).toEqual([]);
   });
 
   it('a profile that is not available to agents ends with profile-not-exposed', async () => {

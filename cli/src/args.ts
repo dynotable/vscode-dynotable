@@ -12,19 +12,21 @@ export const EDITOR_BRIDGE_NAME = 'dynotable-lsp';
 /** Where `run` reads its statement. */
 export type Input = {kind: 'file'; path: string} | {kind: 'stdin'} | {kind: 'text'; text: string};
 
-export interface Command {
+interface CommandBase {
   kind: 'command';
-  command: Subcommand;
   /** False only for the editor bridge: the session sends no `purpose`. */
   agent: boolean;
   /** False under `--no-launch`. */
   launch: boolean;
   profile?: string;
-  rowCap?: number;
-  lang?: Lang;
-  /** `run` only. */
-  input?: Input;
 }
+
+export type Command = CommandBase &
+  (
+    | {command: 'lsp'}
+    | {command: 'profiles' | 'tables' | 'indices'}
+    | {command: 'run'; input: Input; lang?: Lang; rowCap?: number}
+  );
 
 export type Invocation =
   | Command
@@ -103,38 +105,48 @@ export function parse(argv0: string, args: readonly string[]): Invocation {
   const subcommand = command as Subcommand;
   const refused = given.find((name) => !ALLOWED[subcommand].includes(name));
   if (refused) return usage(`${subcommand} does not take ${FLAG_NAMES[refused]}.`);
-  const result: Command = {kind: 'command', command: subcommand, agent: true, ...common(values)};
+  const base = {kind: 'command', agent: true, ...common(values)} as const;
   if (subcommand !== 'run') {
-    return rest.length > 0 ? usage(`${subcommand} takes no arguments.`) : result;
+    if (rest.length > 0) return usage(`${subcommand} takes no arguments.`);
+    return subcommand === 'lsp' ? {...base, command: 'lsp'} : {...base, command: subcommand};
   }
 
+  let rowCap: number | undefined;
   if (values['row-cap'] !== undefined) {
     if (!/^[1-9]\d*$/.test(values['row-cap']))
       return usage('--row-cap must be a positive integer.');
-    result.rowCap = Number(values['row-cap']);
+    rowCap = Number(values['row-cap']);
   }
+  let lang: Lang | undefined;
   if (values.lang !== undefined) {
     if (!(LANGS as readonly string[]).includes(values.lang)) {
       return usage(`--lang must be one of ${LANGS.join(', ')}.`);
     }
-    result.lang = values.lang as Lang;
+    lang = values.lang as Lang;
   }
+  let input: Input;
   if (values.expression !== undefined) {
     if (rest.length > 0) return usage('Give -e or an input, not both.');
-    result.input = {kind: 'text', text: values.expression};
+    input = {kind: 'text', text: values.expression};
   } else if (rest.length !== 1) {
     return usage('run takes one input: a file, - for stdin, or -e <statement>.');
   } else {
-    result.input = rest[0] === '-' ? {kind: 'stdin'} : {kind: 'file', path: rest[0] as string};
+    input = rest[0] === '-' ? {kind: 'stdin'} : {kind: 'file', path: rest[0] as string};
   }
   // A file's extension names its language. Stdin and -e have none.
-  if (result.input.kind === 'file' && result.lang) {
+  if (input.kind === 'file' && lang) {
     return usage('--lang applies only to stdin and -e. A file takes its language from its name.');
   }
-  if (result.input.kind !== 'file' && !result.lang) {
+  if (input.kind !== 'file' && !lang) {
     return usage(`--lang is required with stdin and -e: ${LANGS.join(', ')}.`);
   }
-  return result;
+  return {
+    ...base,
+    command: 'run',
+    input,
+    ...(lang === undefined ? {} : {lang}),
+    ...(rowCap === undefined ? {} : {rowCap})
+  };
 }
 
 function common(values: {profile?: string; 'no-launch'?: boolean}) {

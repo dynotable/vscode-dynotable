@@ -5,7 +5,8 @@ import {PassThrough} from 'node:stream';
 import {setTimeout as sleep} from 'node:timers/promises';
 import {pathToFileURL} from 'node:url';
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {frame, FrameReader, type Id} from '../../../src/rpc';
+import {REQUEST_FAILED, type WireError} from '../../../src/protocol';
+import {frame, FrameReader, RpcFailure, type Id} from '../../../src/rpc';
 import {sink} from '../io';
 import {useHarness} from '../test-session';
 import {createBridge, type Bridge, type BridgeOptions} from './lsp-bridge';
@@ -258,6 +259,24 @@ describe('handshake and retry', () => {
     expect(editor.codes).toEqual([1]);
   });
 
+  // The app's sentence says why; the CLI's generic start-failed text cannot.
+  it("an app refusal of the editor's initialize reaches the editor as the app sent it", async () => {
+    await h.fake.start();
+    const refusal: WireError = {
+      code: REQUEST_FAILED,
+      message: 'This connection is already initialized.',
+      data: {code: 'run-failed'}
+    };
+    h.fake.onInitialize = () => {
+      throw new RpcFailure(refusal);
+    };
+    const editor = await connect();
+    await editor.done;
+    expect(answerTo(editor, 1)?.error).toEqual(refusal);
+    expect(JSON.parse(editor.stderr)).toMatchObject({code: 'run-failed', detail: refusal.message});
+    expect(editor.codes).toEqual([1]);
+  });
+
   it('a malformed .dynotable.json answers the initialize with an error and never connects', async () => {
     await h.fake.start();
     writeFileSync(join(h.cwd, '.dynotable.json'), '{not json');
@@ -267,6 +286,22 @@ describe('handshake and retry', () => {
     expect(answerTo(editor, 1)?.error?.message).toContain('.dynotable.json');
     expect(h.fake.initializeParams).toEqual([]);
     expect(editor.codes).toEqual([1]);
+  });
+});
+
+describe('the first frame', () => {
+  it.each([
+    ['is not an initialize request', framed({jsonrpc: '2.0', method: 'initialized', params: {}})],
+    ['has a bad header', Buffer.from('Content-Length: x\r\n\r\n{}', 'utf8')]
+  ])('that %s prints a usage line, answers nothing and exits 1', async (_, bytes) => {
+    await h.fake.start();
+    const editor = startBridge();
+    editor.stdin.write(bytes);
+    await editor.done;
+    expect(JSON.parse(editor.stderr)).toMatchObject({code: 'usage'});
+    expect(editor.stdout().length).toBe(0);
+    expect(editor.codes).toEqual([1]);
+    expect(h.fake.initializeParams).toEqual([]);
   });
 });
 
@@ -389,7 +424,7 @@ describe('close and exit', () => {
     h.fake.resetOnAccept = true;
     const editor = await connect();
     await editor.done;
-    expect(answerTo(editor, 1)?.error).toBeDefined();
+    expect(errorCodeOf(answerTo(editor, 1))).toBe('connection-ended');
     expect(editor.codes).toEqual([1]);
   });
 });

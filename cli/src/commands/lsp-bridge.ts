@@ -1,11 +1,11 @@
 import type {Socket} from 'node:net';
 import {fileURLToPath} from 'node:url';
 import type {StartHandle, StartOutcome, StartParams} from '../../../src/connect-core';
-import {REQUEST_FAILED} from '../../../src/protocol';
+import {REQUEST_FAILED, type WireError} from '../../../src/protocol';
 import {frame, FrameReader, parseMessage, type Id, type Message} from '../../../src/rpc';
 import {readDotfile} from '../dotfile';
 import {EXIT, type Sink} from '../io';
-import {messageOf, type ErrorCode} from '../messages';
+import {codeOfError, messageOf, type ErrorCode} from '../messages';
 import {failureLine} from '../output';
 import {createCore, okOutcome, refusedOutcome, type CoreOptions} from '../session';
 
@@ -20,8 +20,6 @@ export interface BridgeOptions extends CoreOptions {
   cwd: string;
   /** `--profile`. */
   profile?: string;
-  /** Used under `--no-launch` only. */
-  awaitPortFileMs: number;
 }
 
 export interface Bridge {
@@ -78,6 +76,8 @@ export function createBridge(options: BridgeOptions): Bridge {
   /** The editor's bytes after `initialize`, until a session is connected. */
   let held: Buffer[] = [];
   let live: Socket | undefined;
+  /** The app's error answer to the latest attempt's `initialize`, as it sent it. */
+  let refusal: {answer: Buffer; error: WireError} | undefined;
   let shutdown = false;
   let ended = false;
   let settle!: () => void;
@@ -88,6 +88,7 @@ export function createBridge(options: BridgeOptions): Bridge {
     const reader = new FrameReader();
     const handshake: Handshake = {socket, toEditor: [], closed: false};
     handshakes.set(params.attempt, handshake);
+    refusal = undefined;
     // ConnectCore is not told of a close: the bridge ends instead of reconnecting, because the
     // editor's session cannot move to a new connection.
     const outcome = new Promise<StartOutcome>((resolve) => {
@@ -115,6 +116,7 @@ export function createBridge(options: BridgeOptions): Bridge {
           socket.pause();
           handshake.toEditor.unshift(frame(body));
           handshake.toEditor.push(reader.remainder);
+          if (message.error) refusal = {answer: frame(body), error: message.error};
           resolve(message.error ? refusedOutcome(message.error) : okOutcome(message.result));
           return;
         }
@@ -131,8 +133,12 @@ export function createBridge(options: BridgeOptions): Bridge {
     };
   };
 
+  // Only `--no-launch` waits: a launching bridge has started the app itself.
   const core = createCore(
-    {...options, awaitPortFileMs: options.launch ? undefined : options.awaitPortFileMs},
+    {
+      ...options,
+      awaitPortFileMs: options.launch ? undefined : (options.awaitPortFileMs ?? AWAIT_PORT_FILE_MS)
+    },
     start
   );
 
@@ -152,6 +158,13 @@ export function createBridge(options: BridgeOptions): Bridge {
     const answer = {jsonrpc: '2.0', id: initialize?.id ?? null, error};
     io.out(frame(Buffer.from(JSON.stringify(answer), 'utf8')));
     io.err(failureLine({code, ...(detail ? {detail} : {})}));
+    void end(EXIT.failure);
+  }
+
+  /** Passes the app's refusal of `initialize` to the editor, then ends. */
+  function forward({answer, error}: {answer: Buffer; error: WireError}): void {
+    io.out(answer);
+    io.err(failureLine({code: codeOfError(error), detail: error.message}));
     void end(EXIT.failure);
   }
 
@@ -223,7 +236,9 @@ export function createBridge(options: BridgeOptions): Bridge {
     if (ended) return;
     const state = core.current;
     if (state.kind === 'latched') {
-      refuse(state.reason);
+      // The app refused the editor's own `initialize`: its answer says why, the CLI's text cannot.
+      if (state.reason === 'start-failed' && refusal) forward(refusal);
+      else refuse(state.reason);
       return;
     }
     const handshake = state.kind === 'connected' ? handshakes.get(state.attempt) : undefined;

@@ -46,17 +46,19 @@ export interface CoreOptions {
 
 export interface SessionOptions extends CoreOptions {
   io: Sink;
-  /** Where `.dynotable.json` is read when no `profile` is given. */
-  cwd: string;
+  /** Where `.dynotable.json` is read when no `profile` is given. Absent: it is not read. */
+  cwd?: string;
   /** `--profile`. */
   profile?: string;
 }
 
-export type Answer<T> = {ok: true; value: T} | {ok: false; failure: Failure};
-
-/** A connected session's requests. */
+/** A connected session's requests. An answer is a `Result` with a typed value. */
 export interface Connection {
-  request<T>(method: string, params: unknown, guard: Schema<T>): Promise<Answer<T>>;
+  request<T>(
+    method: string,
+    params: unknown,
+    guard: Schema<T>
+  ): Promise<{value: T} | {failure: Failure}>;
   notify(method: string, params: unknown): void;
 }
 
@@ -76,10 +78,10 @@ const connection = (peer: Peer): Connection => ({
     try {
       value = await peer.request(method, params).response;
     } catch (error) {
-      if (!(error instanceof RpcFailure)) return {ok: false, failure: {code: 'connection-ended'}};
-      return {ok: false, failure: {code: codeOfError(error.error), detail: error.error.message}};
+      if (!(error instanceof RpcFailure)) return {failure: {code: 'connection-ended'}};
+      return {failure: {code: codeOfError(error.error), detail: error.error.message}};
     }
-    return is(guard, value) ? {ok: true, value} : {ok: false, failure: {code: 'bad-answer'}};
+    return is(guard, value) ? {value} : {failure: {code: 'bad-answer'}};
   },
   notify: (method, params) => peer.notify(method, params)
 });
@@ -176,7 +178,7 @@ export function createSession(options: SessionOptions): CliSession {
 
   return {
     async run(work) {
-      if (profile === undefined) {
+      if (profile === undefined && options.cwd !== undefined) {
         const dotfile = readDotfile(options.cwd);
         if (dotfile.kind === 'error') {
           emit(io, {failure: {code: 'usage', detail: dotfile.message}});

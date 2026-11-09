@@ -1,7 +1,7 @@
 import {readFileSync} from 'node:fs';
 import {join} from 'node:path';
 
-export const DOTFILE = '.dynotable.json';
+const DOTFILE = '.dynotable.json';
 
 export type Dotfile =
   | {kind: 'none'}

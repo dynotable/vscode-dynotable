@@ -1,13 +1,16 @@
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
 import {describe, expect, it} from 'vitest';
+import {INIT_TIMEOUT_MS} from '../src/connect-core';
 import {EDITOR_BRIDGE_NAME, parse} from '../cli/src/args';
+import {AWAIT_PORT_FILE_MS} from '../cli/src/commands/lsp-bridge';
 import {locate} from '../cli/src/document';
 
 interface LspServer {
   command: string;
   args: string[];
   extensionToLanguage: Record<string, string>;
+  startupTimeout: number;
 }
 
 const readJson = (file: string): unknown =>
@@ -36,6 +39,12 @@ describe('the Claude Code plugin', () => {
         agent: true,
         launch: false
       });
+    });
+
+    // A bridge waits for the port file, then for the app's initialize answer. A shorter timeout
+    // would have Claude Code kill a bridge that is still within its own waits.
+    it('gives the bridge time for both of its waits', () => {
+      expect(server.startupTimeout).toBeGreaterThanOrEqual(AWAIT_PORT_FILE_MS + INIT_TIMEOUT_MS);
     });
 
     // Claude Code keys on the last extension, so a `.sql` key would hand every SQL file in a

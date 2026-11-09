@@ -18,10 +18,8 @@ async function print<T>(
   incomplete: (value: T) => boolean
 ): Promise<Result> {
   const answer = await connection.request(method, params, guard);
-  if (!answer.ok) return {failure: answer.failure};
-  return incomplete(answer.value)
-    ? {value: answer.value, failure: {code: 'listing-failed'}}
-    : {value: answer.value};
+  if ('failure' in answer) return answer;
+  return incomplete(answer.value) ? {...answer, failure: {code: 'listing-failed'}} : answer;
 }
 
 export function list(command: ListingCommand): (connection: Connection) => Promise<Result> {

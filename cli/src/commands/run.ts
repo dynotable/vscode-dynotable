@@ -1,4 +1,4 @@
-import {readFile} from 'node:fs/promises';
+import {readFile, realpath} from 'node:fs/promises';
 import type {Readable} from 'node:stream';
 import {text} from 'node:stream/consumers';
 import {runResultSchema} from '../../../src/protocol';
@@ -12,10 +12,21 @@ export interface RunInput {
   lang?: Lang;
 }
 
+/**
+ * A file's text, read only when the file it resolves to has a dedicated name too: a link such as
+ * `q.partiql -> ~/.aws/credentials` must not pass the name check.
+ */
+async function fileText(file: string, place: Place): Promise<string> {
+  const target = await realpath(place.path.resolve(place.cwd, file));
+  const located = locate({kind: 'file', path: target}, undefined, place);
+  if ('message' in located) throw new Error(`${file} links to another file. ${located.message}`);
+  return readFile(target, 'utf8');
+}
+
 async function textOf(input: Input, place: Place, stdin: Readable): Promise<string> {
   switch (input.kind) {
     case 'file':
-      return readFile(place.path.resolve(place.cwd, input.path), 'utf8');
+      return fileText(input.path, place);
     case 'stdin':
       return text(stdin);
     case 'text':
@@ -45,7 +56,7 @@ export function run(
 ): (connection: Connection) => Promise<Result> {
   return async (connection) => {
     connection.notify('textDocument/didOpen', {textDocument: {...document, version: 1}});
-    const answer = await connection.request(
+    return connection.request(
       'workspace/executeCommand',
       {
         command: 'dynotable.runStatement',
@@ -53,6 +64,5 @@ export function run(
       },
       runResultSchema
     );
-    return answer.ok ? {value: answer.value} : {failure: answer.failure};
   };
 }

@@ -32,13 +32,13 @@ The DynoTable app must be installed, and **Settings → Editor integration** mus
 
 ## Commands
 
-| Command                                             | Output                                   |
-| --------------------------------------------------- | ---------------------------------------- |
-| `dynotable-cli tables [--profile <p>]`              | The DynamoDB tables of the profile.      |
-| `dynotable-cli indices [--profile <p>]`             | The OpenSearch indices of the profile.   |
-| `dynotable-cli run <file> [--row-cap <n>]`          | The result of the statement in the file. |
-| `dynotable-cli run - --lang <lang> [--row-cap <n>]` | The result of the statement on stdin.    |
-| `dynotable-cli run -e '<statement>' --lang <lang>`  | The result of the statement in the text. |
+| Command                                                             | Output                                   |
+| ------------------------------------------------------------------- | ---------------------------------------- |
+| `dynotable-cli tables [--profile <p>]`                              | The DynamoDB tables of the profile.      |
+| `dynotable-cli indices [--profile <p>]`                             | The OpenSearch indices of the profile.   |
+| `dynotable-cli run <file> [--profile <p>] [--row-cap <n>]`          | The result of the statement in the file. |
+| `dynotable-cli run - --lang <lang> [--profile <p>] [--row-cap <n>]` | The result of the statement on stdin.    |
+| `dynotable-cli run -e '<statement>' --lang <lang> [--profile <p>]`  | The result of the statement in the text. |
 
 - `<lang>` is `sql`, `partiql` or `opensearch`.
 - A file must end in `.dtsql`, `.dynotable.sql`, `.partiql` or `.opensearch`. The name gives the
@@ -79,4 +79,11 @@ printf '// dynotable: index=orders\n{"query": {"match": {"status": "shipped"}}}'
 ## Rules
 
 - Use the subcommands only. Never write Language Server frames into `dynotable-cli lsp`.
-- Every request appears in the audit log of the profile in DynoTable.
+- Each `tables`, `indices` and `run` request appears in the audit log of the profile in DynoTable.
+  `profiles` does not.
+
+## Known limitation
+
+The plugin's language server stops when DynoTable quits, and Claude Code restarts it at most twice
+in a session. When diagnostics stop after DynoTable was closed for a while, tell the user to start
+a new Claude Code session. This is not verified yet.

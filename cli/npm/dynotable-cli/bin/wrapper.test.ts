@@ -94,9 +94,14 @@ describe.skipIf(process.platform === 'win32' || !host)('the npm wrapper', () => 
     }
   );
 
-  it('the dynotable-lsp bin starts the binary under that name', async () => {
-    const run = start('dynotable-lsp.mjs', ['argv0']);
-    expect(await run.ended).toEqual({code: 0, signal: null});
-    expect(run.stdout()).toBe('dynotable-lsp\n');
-  });
+  // The name picks the session kind: `dynotable-lsp` is an editor session, so a `dynotable-cli`
+  // bin started under it would hand every agent the full roster.
+  it.each(['dynotable-cli', 'dynotable-lsp'])(
+    'the %s bin starts the binary under that name',
+    async (name) => {
+      const run = start(`${name}.mjs`, ['argv0']);
+      expect(await run.ended).toEqual({code: 0, signal: null});
+      expect(run.stdout()).toBe(`${name}\n`);
+    }
+  );
 });

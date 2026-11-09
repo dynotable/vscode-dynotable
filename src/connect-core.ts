@@ -3,7 +3,7 @@ import type {PortFile} from './protocol';
 import type {LatchedReason} from './reasons';
 
 /** Longer than the server's own 30 s handshake deadline, so the server's answer arrives first. */
-const INIT_TIMEOUT_MS = 40_000;
+export const INIT_TIMEOUT_MS = 40_000;
 /** How long a cold `--headless` start may run with no port file. */
 const COLD_START_MS = 30_000;
 /** How long to wait for the port file after a running app was nudged (exit 0). */

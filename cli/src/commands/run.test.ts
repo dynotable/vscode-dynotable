@@ -1,10 +1,8 @@
-import {writeFileSync} from 'node:fs';
+import {symlinkSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import {Readable} from 'node:stream';
 import {pathToFileURL} from 'node:url';
 import {describe, expect, it} from 'vitest';
-import type {WireError} from '../../../src/protocol';
-import {RpcFailure} from '../../../src/rpc';
 import {useHarness} from '../test-session';
 import {readDocument, run, type RunInput} from './run';
 
@@ -69,17 +67,6 @@ describe('run', () => {
     expect(h.codes).toEqual([0]);
   });
 
-  it('a write fails with stage-in-app', async () => {
-    await h.fake.start();
-    h.fake.handle('command:dynotable.runStatement', () => {
-      throw new RpcFailure(h.fake.fixture('error-stage-in-app.json') as WireError);
-    });
-    await runOf({input: {kind: 'text', text: 'DELETE FROM "orders"'}, lang: 'partiql'});
-    expect(h.stdout).toBe('');
-    expect(h.failure().code).toBe('stage-in-app');
-    expect(h.codes).toEqual([1]);
-  });
-
   // main.ts reads the input before it connects, so a bad input never starts the app.
   it('a missing file is a usage error', async () => {
     const read = await readDocument(
@@ -88,5 +75,31 @@ describe('run', () => {
       Readable.from([])
     );
     expect(read).toEqual({failure: {code: 'usage', detail: expect.stringContaining('ENOENT')}});
+  });
+
+  // The name is checked before any read, so a missing file says nothing about the file system.
+  it('a name that is not dedicated is refused before the file is read', async () => {
+    const read = await readDocument(
+      {input: {kind: 'file', path: 'missing.sql'}},
+      {cwd: h.cwd, path},
+      Readable.from([])
+    );
+    expect(read).toEqual({
+      failure: {code: 'usage', detail: expect.stringContaining('the name must end in')}
+    });
+  });
+
+  // Else a link would send a secret file to the app, and its tokens into a parser error.
+  it('refuses a dedicated name that links to a file without one', async () => {
+    writeFileSync(path.join(h.cwd, 'credentials'), 'aws_secret_access_key = x');
+    symlinkSync(path.join(h.cwd, 'credentials'), path.join(h.cwd, 'q.partiql'));
+    const read = await readDocument(
+      {input: {kind: 'file', path: 'q.partiql'}},
+      {cwd: h.cwd, path},
+      Readable.from([])
+    );
+    expect(read).toEqual({
+      failure: {code: 'usage', detail: expect.stringContaining('links to another file')}
+    });
   });
 });

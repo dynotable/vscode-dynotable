@@ -174,6 +174,10 @@ as Claude Code, Codex and Cursor, and for scripts. It only reads, and its output
 - One or more profiles **available to agents**. In DynoTable, switch on **Available to agents** for
   each profile that agents can read. `dynotable-cli` cannot see the other profiles.
 
+An app older than 1.20.0 ignores agent sessions. `dynotable-cli` refuses it with `update-app`, but
+only after the app answered `initialize`, so that app has already signed in to the named profile.
+No data reaches the agent.
+
 ### Install
 
 - **npm:** `npm install -g dynotable-cli`. This also installs `dynotable-lsp`.
@@ -183,7 +187,9 @@ as Claude Code, Codex and Cursor, and for scripts. It only reads, and its output
 - **Windows:** use the Releases archive and put the folder that holds `dynotable-cli.exe` on your
   `PATH`. The Claude Code plugin cannot start the command that npm installs on Windows.
 
-Binaries are available for macOS on Apple silicon, Linux x64 and Windows x64.
+Binaries are available for macOS on Apple silicon, Linux x64 and Windows x64. The macOS binary is
+tested on each build, and the Linux x64 binary was run in a container. The Windows binary has not
+been run yet.
 
 ### Commands
 
@@ -227,7 +233,10 @@ available to agents both fail with `profile-not-exposed`.
 
 ### Output and exit codes
 
-Stdout holds one JSON document. On failure, stderr holds one JSON line:
+Stdout holds one JSON document: DynoTable's answer to the request, as the protocol defines it
+(see [PROTOCOL.md](PROTOCOL.md)). `profiles` prints the array of `dynotable/listProfiles`, `tables`
+and `indices` print the answer of `dynotable/listTables` and `dynotable/listIndices`, and `run`
+prints the result of `dynotable.runStatement`. On failure, stderr holds one JSON line:
 
 ```json
 {
@@ -262,7 +271,10 @@ Every other `code` comes with a `message` that tells what to do.
 
 Each `tables`, `indices` and `run` request writes a row in the audit log of the profile in
 DynoTable. The row holds the statement, not the rows that it returned. When DynoTable cannot write
-the row, the request fails and returns no data.
+the row, the request fails and returns no data. `profiles` writes no row.
+
+`dynotable-cli lsp` writes rows only for the same requests. Its completion, diagnostics and code
+actions write none: they give table, index and field names, never stored values.
 
 ### Environment variables
 
@@ -315,9 +327,15 @@ The plugin's language server does not start DynoTable. When DynoTable is not run
 waits up to 20 s for the app, and then stops. When you quit DynoTable, the server stops. It does not
 start the app again with no window.
 
+**Known limitation (unverified).** Claude Code restarts a stopped server at most twice in a session
+(`maxRestarts: 2`). Each quit or update of DynoTable, and each 20 s wait that ends with no app, can
+use one restart. When DynoTable stays closed for more than about 40 s, the plugin's diagnostics may
+stop for the rest of the Claude Code session. Start a new Claude Code session to get them back.
+
 ## Other editors: dynotable-lsp
 
 `dynotable-lsp` connects an editor that speaks the Language Server Protocol over stdio to DynoTable.
+It needs DynoTable 1.20.0 or later, with the Editor integration switched on.
 It is the same program as `dynotable-cli`, under a second name. It opens an editor session: it can
 use every profile, and it does not write audit rows. It starts DynoTable with no window when the app
 is not running. Use it only in an editor, not in an agent.

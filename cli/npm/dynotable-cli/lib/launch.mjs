@@ -14,7 +14,7 @@ const FORWARDED = ['SIGINT', 'SIGTERM'];
  * @param {string} argv0
  * @param {readonly string[]} args
  */
-export function launch(binary, argv0, args) {
+function launch(binary, argv0, args) {
   const child = spawn(binary, args, {stdio: 'inherit', argv0});
   /** @param {NodeJS.Signals} signal */
   const forward = (signal) => {

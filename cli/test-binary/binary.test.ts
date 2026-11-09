@@ -132,6 +132,24 @@ it('profiles prints the rows and the process ends', async () => {
   });
 });
 
+// The floor is compiled in: an app that ignores `purpose` must never get an agent's requests.
+it('an app below the compiled floor ends with update-app and is sent no request', async () => {
+  fake.version = '1.0.0';
+  const run = start(['tables']);
+  expect(await within(run.ended, END_MS)).toEqual({code: 1, signal: null});
+  expect(JSON.parse(run.stderr())).toMatchObject({code: 'update-app'});
+  expect(fake.received.map((message) => message.method)).not.toContain('dynotable/listTables');
+});
+
+it('profiles ignores a broken .dynotable.json, which other commands refuse', async () => {
+  writeFileSync(join(home, '.dynotable.json'), '{not json');
+  const profiles = start(['profiles']);
+  expect(await within(profiles.ended, END_MS)).toEqual({code: 0, signal: null});
+  const tables = start(['tables']);
+  expect(await within(tables.ended, END_MS)).toEqual({code: 2, signal: null});
+  expect(JSON.parse(tables.stderr())).toMatchObject({code: 'usage'});
+});
+
 it('lsp answers the editor initialize over stdio and ends at stdin EOF', async () => {
   const run = start(['lsp', '--no-launch']);
   run.stdin.write(framed(INITIALIZE));
