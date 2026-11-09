@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3 — 2026-11-09
+
+- The README shows a SQL JOIN, a PartiQL query and an OpenSearch query.
+
 ## 0.1.2 — 2026-11-08
 
 - The Marketplace listing says which query language works with which engine. Its name and tags
