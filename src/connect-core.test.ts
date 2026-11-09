@@ -618,6 +618,34 @@ async function stop(h: ReturnType<typeof harness>) {
 }
 
 describe('stop', () => {
+  // A restart parked on a run that never ends would keep its caller waiting forever.
+  it('during a restart that waits for a run: the restart settles and starts no session', async () => {
+    const h = harness({file: FRESH});
+    await h.core.ensureConnected();
+    void h.core.trackRun(() => new Promise<void>(() => {}));
+    let settled = false;
+    void h.core.restart().then(() => (settled = true));
+    await vi.advanceTimersByTimeAsync(0);
+    const noState = await stop(h);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(settled).toBe(true);
+    expect(h.starts).toHaveLength(1);
+    noState();
+  });
+
+  it('before a restart reaches the run wait: the restart settles and starts no session', async () => {
+    const h = harness({file: FRESH});
+    await h.core.ensureConnected();
+    void h.core.trackRun(() => new Promise<void>(() => {}));
+    const noState = await stop(h);
+    let settled = false;
+    void h.core.restart().then(() => (settled = true));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(settled).toBe(true);
+    expect(h.starts).toHaveLength(1);
+    noState();
+  });
+
   // A cancelled nudge wait read as a timeout would spawn the app a second time.
   it('during the nudge wait: no second spawn and no session', async () => {
     const h = harness();

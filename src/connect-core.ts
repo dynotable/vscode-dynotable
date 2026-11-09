@@ -225,6 +225,7 @@ export class ConnectCore {
       this.restarting = true;
       try {
         await this.inFlight;
+        if (this.stopped) return;
         if (this.runs > 0) {
           this.setState({kind: 'waiting-for-run'});
           await new Promise<void>((resolve) => this.runWaiters.push(resolve));
@@ -307,6 +308,7 @@ export class ConnectCore {
    */
   async stop(): Promise<void> {
     this.stopping.abort();
+    for (const resolve of this.runWaiters.splice(0)) resolve();
     await this.dispose();
   }
 
