@@ -5,7 +5,7 @@ import {join} from 'node:path';
 import {after, before, describe, it} from 'mocha';
 import * as vscode from 'vscode';
 import {LanguageClient} from 'vscode-languageclient/node';
-import {RpcFailure} from '../../scripts/rpc';
+import {RpcFailure} from '../rpc';
 import {REASONS} from '../reasons';
 import {
   api,

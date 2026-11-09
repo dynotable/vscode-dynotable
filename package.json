@@ -222,7 +222,7 @@
   "scripts": {
     "build": "node esbuild.mjs",
     "vscode:prepublish": "node esbuild.mjs --production",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p media",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p media && tsc --noEmit -p cli",
     "lint": "oxlint && oxfmt --check",
     "format": "oxfmt",
     "test": "vitest run",

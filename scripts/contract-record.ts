@@ -18,7 +18,7 @@ import {isDeepStrictEqual, parseArgs} from 'node:util';
 import {currentPlatform, portFilePath, readPortFile, userDataDir} from '../src/discovery';
 import {METHOD_NOT_FOUND, problem, type PortFile, type ProfileRow} from '../src/protocol';
 import {GUARDS, leaks, readManifest, scrub, strings, type Manifest} from './contract';
-import {Peer, RpcFailure} from './rpc';
+import {Peer, RpcFailure} from '../src/rpc';
 
 const CONTRACT_DIR = 'contract';
 

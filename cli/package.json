@@ -1,0 +1,8 @@
+{
+  "name": "dynotable-cli-source",
+  "private": true,
+  "description": "The dynotable-cli binary. Built with Bun; runs on Node.js APIs only.",
+  "engines": {
+    "bun": "1.4.4"
+  }
+}

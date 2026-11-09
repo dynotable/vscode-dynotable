@@ -4,7 +4,7 @@ import {createServer, type Server, type Socket} from 'node:net';
 import {dirname} from 'node:path';
 import {setTimeout as sleep} from 'node:timers/promises';
 import {readFixture} from '../../scripts/contract';
-import {Peer, RpcFailure, type Id} from '../../scripts/rpc';
+import {Peer, RpcFailure, type Id} from '../rpc';
 import {
   METHOD_NOT_FOUND,
   REQUEST_FAILED,

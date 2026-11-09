@@ -51,7 +51,9 @@ function harness(options: Options = {}) {
   const spawns: Spawned[] = [];
   const starts: Started[] = [];
   const connects: number[] = [];
+  const sockets: Array<{destroy: Mock<() => void>}> = [];
   const events: string[] = [];
+  const states: State[] = [];
   const seams: CoreSeams = {
     platform: options.platform ?? 'linux',
     home: '/home/u',
@@ -63,7 +65,9 @@ function harness(options: Options = {}) {
     connect: async (port) => {
       connects.push(port);
       await options.connect?.(port);
-      return {destroy: () => {}};
+      const socket = {destroy: vi.fn<() => void>()};
+      sockets.push(socket);
+      return socket;
     },
     locateApp: () =>
       options.app === null ? undefined : (options.app ?? {binary: '/usr/bin/dynotable'}),
@@ -83,7 +87,7 @@ function harness(options: Options = {}) {
       if (auto) answer(auto);
       return {outcome, dispose};
     },
-    onState: () => {},
+    onState: (state) => void states.push(state),
     ...options.seams
   };
   const core = new ConnectCore(seams);
@@ -93,7 +97,9 @@ function harness(options: Options = {}) {
     spawns,
     starts,
     connects,
+    sockets,
     events,
+    states,
     state,
     setFile: (next: PortFile | undefined) => (file = next)
   };
@@ -597,5 +603,193 @@ describe('concurrency', () => {
     await h.core.latch(2, 'missing-request');
     expect(h.state()).toEqual(latched('missing-request'));
     expect(h.starts[1]?.dispose).toHaveBeenCalled();
+  });
+});
+
+/** Stops the core and returns a check that its state did not change and was not reported since. */
+async function stop(h: ReturnType<typeof harness>) {
+  const reported = h.states.length;
+  const frozen = h.state();
+  await h.core.stop();
+  return () => {
+    expect(h.states.slice(reported)).toEqual([]);
+    expect(h.state()).toBe(frozen);
+  };
+}
+
+describe('stop', () => {
+  // A cancelled nudge wait read as a timeout would spawn the app a second time.
+  it('during the nudge wait: no second spawn and no session', async () => {
+    const h = harness();
+    const done = h.core.ensureConnected();
+    await vi.advanceTimersByTimeAsync(0);
+    h.spawns[0]?.child.emit('exit', 0, null);
+    await vi.advanceTimersByTimeAsync(1000);
+    const noState = await stop(h);
+    expect(vi.getTimerCount()).toBe(0);
+    await vi.advanceTimersByTimeAsync(60_000);
+    await done;
+    expect(h.spawns).toHaveLength(1);
+    expect(h.starts).toHaveLength(0);
+    noState();
+  });
+
+  it('during the cold-start wait: a port file that appears later starts no session', async () => {
+    const h = harness();
+    const done = h.core.ensureConnected();
+    await vi.advanceTimersByTimeAsync(1000);
+    const noState = await stop(h);
+    expect(vi.getTimerCount()).toBe(0);
+    h.setFile(FRESH);
+    await vi.advanceTimersByTimeAsync(60_000);
+    await done;
+    expect(h.connects).toEqual([]);
+    expect(h.starts).toHaveLength(0);
+    expect(h.spawns[0]?.child.listenerCount('exit')).toBe(0);
+    expect(h.spawns[0]?.child.listenerCount('error')).toBe(0);
+    noState();
+  });
+
+  it('with a connect pending: a refusal that arrives later launches nothing', async () => {
+    let refuse!: () => void;
+    const h = harness({
+      file: FRESH,
+      connect: () => new Promise((_resolve, reject) => (refuse = () => reject(refused())))
+    });
+    const done = h.core.ensureConnected();
+    await vi.advanceTimersByTimeAsync(0);
+    const noState = await stop(h);
+    refuse();
+    await done;
+    expect(h.spawns).toHaveLength(0);
+    noState();
+  });
+
+  it('with a connect pending: the socket that arrives later is destroyed', async () => {
+    let arrive!: () => void;
+    const h = harness({file: FRESH, connect: () => new Promise((resolve) => (arrive = resolve))});
+    const done = h.core.ensureConnected();
+    await vi.advanceTimersByTimeAsync(0);
+    const noState = await stop(h);
+    arrive();
+    await done;
+    expect(h.sockets[0]?.destroy).toHaveBeenCalled();
+    expect(h.starts).toHaveLength(0);
+    noState();
+  });
+
+  it('with the initialize answer pending: disposes the handle and destroys its socket', async () => {
+    const h = harness({file: FRESH, answer: () => undefined});
+    const done = h.core.ensureConnected();
+    await vi.advanceTimersByTimeAsync(0);
+    const noState = await stop(h);
+    expect(vi.getTimerCount()).toBe(0);
+    await done;
+    expect(h.starts[0]?.dispose).toHaveBeenCalled();
+    expect(h.sockets[0]?.destroy).toHaveBeenCalled();
+    noState();
+  });
+
+  it('an initialize answer in the same tick as stop: the session is closed, not kept', async () => {
+    const h = harness({file: FRESH, answer: () => undefined});
+    const done = h.core.ensureConnected();
+    await vi.advanceTimersByTimeAsync(0);
+    h.starts[0]?.answer(OK);
+    const noState = await stop(h);
+    await done;
+    expect(h.starts[0]?.dispose).toHaveBeenCalled();
+    expect(h.sockets[0]?.destroy).toHaveBeenCalled();
+    noState();
+  });
+
+  // The auth retry re-reads the port file and connects again unless the attempt checks the stop.
+  it('while a refused attempt disposes: no second connect', async () => {
+    const h = harness({file: FRESH, answer: () => undefined});
+    const done = h.core.ensureConnected();
+    await vi.advanceTimersByTimeAsync(0);
+    let disposed!: () => void;
+    h.starts[0]?.dispose.mockImplementation(() => new Promise((resolve) => (disposed = resolve)));
+    h.starts[0]?.answer({kind: 'auth-failed'});
+    await vi.advanceTimersByTimeAsync(0);
+    const noState = await stop(h);
+    disposed();
+    await done;
+    expect(h.connects).toEqual([FRESH.port]);
+    noState();
+  });
+
+  // The close queues a restart for the new port file; the restart must not run after the stop.
+  it('a close with a new port file in the same tick as stop starts no second session', async () => {
+    const h = harness({file: STALE, kill: () => {}});
+    await h.core.ensureConnected();
+    h.setFile(FRESH);
+    h.starts[0]?.params.onClosed();
+    const noState = await stop(h);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.starts).toHaveLength(1);
+    expect(vi.getTimerCount()).toBe(0);
+    noState();
+  });
+
+  it('a restart that waits for the attempt in flight does nothing after the stop', async () => {
+    const h = harness({file: FRESH, answer: () => undefined});
+    void h.core.ensureConnected();
+    await vi.advanceTimersByTimeAsync(0);
+    const restarted = h.core.restart();
+    await vi.advanceTimersByTimeAsync(0);
+    const noState = await stop(h);
+    await restarted;
+    expect(h.starts).toHaveLength(1);
+    noState();
+  });
+
+  it('closes the live session', async () => {
+    const h = harness({file: FRESH});
+    await h.core.ensureConnected();
+    const noState = await stop(h);
+    expect(h.starts[0]?.dispose).toHaveBeenCalled();
+    expect(h.sockets[0]?.destroy).toHaveBeenCalled();
+    await h.core.ensureConnected();
+    expect(h.starts).toHaveLength(1);
+    noState();
+  });
+});
+
+describe('awaitPortFileMs', () => {
+  const waiting = {launcherOff: true, seams: {awaitPortFileMs: 20_000}};
+
+  it('with no port file: latches launcher-off at the end of the window, with no spawn', async () => {
+    const h = harness(waiting);
+    const done = h.core.ensureConnected();
+    await vi.advanceTimersByTimeAsync(19_999);
+    expect(h.state()).toEqual({kind: 'starting'});
+    await vi.advanceTimersByTimeAsync(1);
+    await done;
+    expect(h.state()).toEqual(latched('launcher-off'));
+    expect(h.spawns).toHaveLength(0);
+  });
+
+  it('a port file that appears in the window connects', async () => {
+    const h = harness(waiting);
+    const done = h.core.ensureConnected();
+    await vi.advanceTimersByTimeAsync(1000);
+    h.setFile(FRESH);
+    await vi.advanceTimersByTimeAsync(250);
+    await done;
+    expect(h.connects).toEqual([FRESH.port]);
+    expect(h.state()).toEqual(connected);
+    expect(h.spawns).toHaveLength(0);
+  });
+
+  it('stop during the wait reports no state and leaves no timer', async () => {
+    const h = harness(waiting);
+    const done = h.core.ensureConnected();
+    await vi.advanceTimersByTimeAsync(1000);
+    const noState = await stop(h);
+    expect(vi.getTimerCount()).toBe(0);
+    await vi.advanceTimersByTimeAsync(60_000);
+    await done;
+    expect(h.state()).toEqual({kind: 'starting'});
+    noState();
   });
 });

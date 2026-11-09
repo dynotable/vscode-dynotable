@@ -4,6 +4,7 @@
 
 - Node.js 26 or later, and pnpm 12.
 - Docker, for the integration tests.
+- Bun 1.4.4, to compile `dynotable-cli`. The CLI uses Node.js APIs only; Bun is only its compiler.
 
 ## Build and test
 
@@ -26,6 +27,8 @@ tests on the host and opens VS Code windows. Use it on Linux CI under `xvfb-run`
 - `src/test-integration/`: the integration harness and a fake language server. The fake answers
   from the fixtures in `contract/`.
 - `contract/`: the protocol fixtures. `contract/manifest.json` gives each one's provenance.
+- `cli/`: the `dynotable-cli` command line tool. It shares the connection code and the protocol
+  guards in `src/`, and it imports no `vscode` module.
 - `scripts/`: the fixture recorder (`pnpm contract:record`, `pnpm contract:check`). See
   [docs/publishing.md](docs/publishing.md).
 

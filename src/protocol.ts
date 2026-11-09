@@ -13,7 +13,7 @@ export const REQUEST_FAILED = -32803;
 export const METHOD_NOT_FOUND = -32601;
 export const INTERNAL_ERROR = -32603;
 
-const FAILURE_CODES = [
+export const FAILURE_CODES = [
   'profile-required',
   'profile-window-required',
   'reauth-required',
@@ -22,6 +22,8 @@ const FAILURE_CODES = [
   'stage-in-app',
   'busy',
   'planner-refused',
+  'profile-not-exposed',
+  'agent-refused',
   'run-failed'
 ] as const;
 export type FailureCode = (typeof FAILURE_CODES)[number];
