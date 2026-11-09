@@ -3,7 +3,8 @@
   "compilerOptions": {
     "types": ["node"],
     "allowJs": true,
-    "checkJs": true
+    "checkJs": true,
+    "allowImportingTsExtensions": true
   },
   "include": [".", "../claude-plugin"]
 }
