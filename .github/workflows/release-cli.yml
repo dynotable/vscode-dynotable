@@ -1,0 +1,56 @@
+name: Release CLI
+
+# Publishes dynotable-cli when a cli-v* tag is pushed: the three @dynotable/cli-* platform packages,
+# then the dynotable-cli wrapper, then a GitHub Release with the archives. Uses npm Trusted
+# Publishing (OIDC) — no npm token is stored in this repository. Each of the four packages must name
+# this repository and this workflow file (release-cli.yml) as its Trusted Publisher on npmjs.com.
+# It runs on macOS because the darwin binary must carry the ad-hoc signature that Bun applies when it
+# compiles on a Mac; an unsigned arm64 binary does not start.
+
+on:
+  push:
+    tags: ['cli-v*']
+
+permissions:
+  contents: write # the GitHub Release
+  id-token: write # OIDC for npm Trusted Publishing + provenance
+
+jobs:
+  release:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - name: Tag matches the wrapper version
+        run: |
+          version=$(node -p "require('./cli/npm/dynotable-cli/package.json').version")
+          test "${GITHUB_REF_NAME}" = "cli-v${version}" || { echo "Tag ${GITHUB_REF_NAME} is not cli-v${version}"; exit 1; }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm cli:build:all
+      - run: pnpm cli:binary
+      - name: Publish the platform packages, then the wrapper
+        run: |
+          for target in darwin-arm64 linux-x64 win-x64; do
+            (cd "cli/dist/${target}" && npm publish --provenance --access public)
+          done
+          (cd cli/npm/dynotable-cli && npm publish --provenance --access public)
+      - name: GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd cli/dist
+          shasum -a 256 dynotable-cli-*.tar.gz > SHA256SUMS.txt
+          gh release create "${GITHUB_REF_NAME}" --title "dynotable-cli ${GITHUB_REF_NAME#cli-v}" \
+            --notes "Install: \`npm install -g dynotable-cli\`. The macOS archive is not notarized, so macOS blocks it after a browser download; use npm on macOS. Verify downloads with SHA256SUMS.txt. Guide: https://dynotable.com/docs/dynotable-cli" \
+            dynotable-cli-*.tar.gz SHA256SUMS.txt
