@@ -4,7 +4,7 @@ name: Release CLI
 # then the dynotable-cli wrapper, then a GitHub Release with the archives. Uses npm Trusted
 # Publishing (OIDC) — no npm token is stored in this repository. Each of the four packages must name
 # this repository and this workflow file (release-cli.yml) as its Trusted Publisher on npmjs.com.
-# It runs on macOS because the darwin binary must carry the ad-hoc signature that Bun applies when it
+# It runs on macOS (the Blacksmith runner the app release uses) because the darwin binary must carry the ad-hoc signature that Bun applies when it
 # compiles on a Mac; an unsigned arm64 binary does not start.
 
 on:
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: macos-14
+    runs-on: blacksmith-6vcpu-macos-26
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
