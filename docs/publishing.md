@@ -86,6 +86,23 @@ repo.
 
 4. Tag the commit `v<version>`.
 
+## dynotable-cli
+
+The CLI has its own version, in `cli/npm/dynotable-cli/package.json`, and its own tags: `cli-v<version>`.
+
+1. Set `version` in the wrapper and the same version on its three `@dynotable/cli-*`
+   `optionalDependencies`. The build refuses a mismatch.
+2. Merge, then push the tag `cli-v<version>` on the merge commit. `.github/workflows/release-cli.yml`
+   runs the checks, builds the three binaries, publishes the platform packages and then the wrapper
+   with npm Trusted Publishing, and creates the GitHub Release with the archives and `SHA256SUMS.txt`.
+
+Each of the four packages names `dynotable/vscode-dynotable` and `release-cli.yml` as its Trusted
+Publisher on npmjs.com (package Settings → Trusted Publisher → GitHub Actions). A new package cannot
+do that before it exists: its first version is published by hand, with `npm login` as
+`dynotable-user` and the account's security key for each publish.
+
+The binaries are not signed with a Developer ID or notarized, and the Windows binary is not signed.
+
 ## Before the first publish
 
 - Make sure no commit from before the history squash is still reachable on GitHub. Ask GitHub
