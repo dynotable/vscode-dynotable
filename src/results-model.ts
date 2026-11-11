@@ -253,6 +253,10 @@ const plural = (count: number, one: string, many: string) => `${count} ${count =
 /** The status bar reads `$(name)` as an icon. */
 const statusName = (name: string) => name.replaceAll('$(', '\\$(');
 
+export function savedStatus(rows: number, fileName: string): string {
+  return `Saved ${plural(rows, 'row', 'rows')} to ${statusName(fileName)}.`;
+}
+
 /**
  * The text and the status bar message of a copy. `undefined` when `resultId` is not the current
  * result's id, or when an index is out of range.

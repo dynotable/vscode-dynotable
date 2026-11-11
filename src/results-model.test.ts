@@ -9,6 +9,7 @@ import {
   parseMessage,
   renderHtml,
   resultView,
+  savedStatus,
   summary,
   toJson,
   type CopyMessage
@@ -325,6 +326,12 @@ describe('copyText', () => {
     expect(
       copyText(orders, 'r1', {type: 'copyColumn', resultId: 'r1', column: 1, rows: [1, 0]})
     ).toEqual({text: 'b\na', status: 'Copied 2 values of \\$(alert).'});
+  });
+
+  // Export's own message: one saved row reads as singular, and a file name never shows an icon.
+  it('names the saved file and the row count', () => {
+    expect(savedStatus(1, 'a$(alert).csv')).toBe('Saved 1 row to a\\$(alert).csv.');
+    expect(savedStatus(120, 'orders.csv')).toBe('Saved 120 rows to orders.csv.');
   });
 
   const jsonValue = (pretty: boolean) =>

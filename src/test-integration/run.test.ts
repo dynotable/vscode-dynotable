@@ -1,4 +1,7 @@
 import {strict as assert} from 'node:assert';
+import {existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import {after, before, beforeEach, describe, it} from 'mocha';
 import * as vscode from 'vscode';
 import {RpcFailure, type Id} from '../rpc';
@@ -6,12 +9,15 @@ import type {CommandArgs, Range, WireError} from '../protocol';
 import {
   api,
   fakeServer,
+  quickPicks,
+  saveDialogs,
   show as showFile,
   sleep,
   toastAnswers,
   toasts,
   waitFor,
-  waitForStatus
+  waitForStatus,
+  workspace
 } from './harness';
 
 const fake = fakeServer();
@@ -65,6 +71,14 @@ const run = () => vscode.commands.executeCommand('dynotable.run');
 
 const show = (name: string, text = TWO_STATEMENTS) => showFile(name, text);
 
+/** A file URI in a new directory, so no Export test reads another one's file. */
+const exportUri = (name: string) =>
+  vscode.Uri.file(join(mkdtempSync(join(tmpdir(), 'dynotable-export-')), name));
+const exportedFiles = () =>
+  readdirSync(workspace).filter((name) => name.startsWith('dynotable-results'));
+const exportResult = async () =>
+  (await panel()).receive({type: 'export', resultId: (await result()).resultId});
+
 /** Starts a held run and returns its id and its settled command promise. */
 async function heldRun(name: string): Promise<{runId: string; done: Thenable<unknown>}> {
   fake.holdRuns = true;
@@ -93,6 +107,11 @@ describe('run', () => {
     fake.unhandle(`command:${RUN}`);
     fake.unhandle(`command:${OPEN}`);
     toasts.length = 0;
+    quickPicks.answer = undefined;
+    quickPicks.during = undefined;
+    quickPicks.shown.length = 0;
+    saveDialogs.answer = undefined;
+    saveDialogs.defaultUri = undefined;
   });
 
   it('lens Run: reaches the panel with the statement range of its argument', async () => {
@@ -294,6 +313,110 @@ describe('run', () => {
     assert.equal(await vscode.env.clipboard.readText(), KNOWN);
     await (await panel()).receive({...selection, resultId: current});
     assert.notEqual(await vscode.env.clipboard.readText(), KNOWN);
+  });
+
+  // The dialogs wait for the user, so a run can end while they are open.
+  it('export: JSON saves the rows the export started with, in query order', async () => {
+    await show('export.dynotable.sql');
+    await run();
+    const started = await result();
+    const uri = exportUri('rows.json');
+    quickPicks.answer = 'JSON';
+    saveDialogs.answer = uri;
+    quickPicks.during = async () => {
+      await showFile('export-during.partiql', 'SELECT * FROM "orders"');
+      await run();
+      const current = await result();
+      assert.notEqual(current.resultId, started.resultId);
+      assert.notDeepEqual(current.columns, started.columns);
+    };
+    await (await panel()).receive({type: 'export', resultId: started.resultId});
+    assert.equal(saveDialogs.defaultUri?.path.endsWith('/dynotable-results.json'), true);
+    assert.equal(
+      readFileSync(uri.fsPath, 'utf8'),
+      `[
+  {
+    "o.orderId": "ORD2024056001",
+    "o.status": "PENDING",
+    "c.country": "Tajikistan"
+  },
+  {
+    "o.orderId": "ORD2024098001",
+    "o.status": "PENDING",
+    "c.country": "China"
+  },
+  {
+    "o.orderId": "ORD2024085001",
+    "o.status": "COMPLETED",
+    "c.country": "Mongolia"
+  }
+]`
+    );
+    assert.deepEqual(toasts, []);
+  });
+
+  // A spreadsheet opens the saved file and would run the formula.
+  it('export: CSV guards a formula cell', async () => {
+    fake.handle(`command:${RUN}`, () => ({
+      columns: ['f'],
+      rows: [{f: '=1+1'}],
+      returnedRows: 1,
+      totalRows: 1,
+      truncated: false,
+      approximateBytes: 10,
+      elapsedMs: 1,
+      executedStatement: 'SELECT f',
+      effectiveRowCap: 500
+    }));
+    await show('export-csv.dynotable.sql');
+    await run();
+    const uri = exportUri('rows.csv');
+    quickPicks.answer = 'CSV';
+    saveDialogs.answer = uri;
+    await exportResult();
+    assert.equal(readFileSync(uri.fsPath, 'utf8'), "f\r\n'=1+1");
+  });
+
+  it('export: an earlier result id saves nothing and asks nothing', async () => {
+    await show('export-stale.dynotable.sql');
+    await run();
+    const first = (await result()).resultId;
+    await run();
+    const uri = exportUri('stale.csv');
+    quickPicks.answer = 'CSV';
+    saveDialogs.answer = uri;
+    await (await panel()).receive({type: 'export', resultId: first});
+    assert.deepEqual(quickPicks.shown, []);
+    assert.equal(existsSync(uri.fsPath), false);
+  });
+
+  it('export: a cancelled pick or save dialog saves nothing', async () => {
+    await show('export-cancel.dynotable.sql');
+    await run();
+    const uri = exportUri('cancelled.csv');
+    saveDialogs.answer = uri;
+    await exportResult();
+    assert.equal(quickPicks.shown.length, 1);
+    assert.equal(existsSync(uri.fsPath), false);
+    quickPicks.answer = 'CSV';
+    saveDialogs.answer = undefined;
+    await exportResult();
+    assert.equal(saveDialogs.defaultUri?.path.endsWith('/dynotable-results.csv'), true);
+    assert.equal(existsSync(uri.fsPath), false);
+    assert.deepEqual(exportedFiles(), []);
+  });
+
+  it('export: a failed write shows the reason', async () => {
+    await show('export-failed.dynotable.sql');
+    await run();
+    const file = exportUri('a-file').fsPath;
+    writeFileSync(file, '');
+    quickPicks.answer = 'CSV';
+    saveDialogs.answer = vscode.Uri.file(join(file, 'rows.csv'));
+    await exportResult();
+    assert.equal(toasts.length, 1, JSON.stringify(toasts));
+    assert.equal(toasts[0]?.kind, 'error');
+    assert.match(toasts[0]?.message ?? '', /^The rows were not saved: \S/);
   });
 
   // A `Selection` serializes its anchor and active ends too.

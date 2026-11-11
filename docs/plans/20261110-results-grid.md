@@ -554,15 +554,15 @@ scripts outside the repository.
 - Modify: `src/test-integration/harness.ts`, `src/test-integration/run.test.ts`
 - Modify: `media/results.ts`, `media/results.test.ts`
 
-- [ ] `export`: check the `resultId` and keep that `RunResult`; quick pick of format items; save dialog
+- [x] `export`: check the `resultId` and keep that `RunResult`; quick pick of format items; save dialog
       with the default URI; `TextEncoder` + `workspace.fs.writeFile`; `Saved N rows to <name>.`; a
       cancelled pick or dialog writes nothing; a failed write shows an error with the reason
-- [ ] the **Export…** toolbar button posts `export` with the `resultId` (add it to the Task 5 button
+- [x] the **Export…** toolbar button posts `export` with the `resultId` (add it to the Task 5 button
       test)
-- [ ] add a `saveDialogs` stub to the harness in the style of `quickPicks` (`answer` URI, the last
+- [x] add a `saveDialogs` stub to the harness in the style of `quickPicks` (`answer` URI, the last
       `defaultUri`); reset `saveDialogs` and `quickPicks` (`answer`, `during`, `shown`) in `run.test.ts`'s
       `beforeEach`; each Export test uses a fresh file URI
-- [ ] integration: Export as JSON writes the expected bytes in query order to the stubbed URI and the
+- [x] integration: Export as JSON writes the expected bytes in query order to the stubbed URI and the
       `defaultUri` ends in `dynotable-results.json`; a run with DIFFERENT rows (a `.partiql` file, or
       `fake.handle`) that ends during the quick pick (`quickPicks.during`, cleared in `finally`) does not
       change what is saved (inside `during`, assert the view's `resultId` and columns changed; the expected
@@ -571,7 +571,7 @@ scripts outside the repository.
       answers set) writes nothing and shows no quick pick; a cancelled pick (save answer set) and a
       cancelled dialog leave no file at the URI or at the `defaultUri` path; a write to a path under a
       file shows an error
-- [ ] run `pnpm typecheck`, `pnpm test` and `pnpm test:integration` - must pass before task 7
+- [x] run `pnpm typecheck`, `pnpm test` and `pnpm test:integration` - must pass before task 7
 
 ### Task 7: Render the grid
 

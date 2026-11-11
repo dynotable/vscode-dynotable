@@ -46,7 +46,8 @@ function render(view: View): void {
       bar.append(
         element('span', view.summary, 'summary'),
         button('Copy CSV', {type: 'copy', resultId: view.resultId, format: 'csv'}),
-        button('Copy JSON', {type: 'copy', resultId: view.resultId, format: 'json'})
+        button('Copy JSON', {type: 'copy', resultId: view.resultId, format: 'json'}),
+        button('Export…', {type: 'export', resultId: view.resultId})
       );
       if (view.columns.length === 0) {
         root.append(element('p', 'No rows.'));

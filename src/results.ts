@@ -1,16 +1,27 @@
 import {randomUUID} from 'node:crypto';
+import {homedir} from 'node:os';
+import {posix} from 'node:path';
 import * as vscode from 'vscode';
 import {is, runResultSchema, type RunResult} from './protocol';
 import {
   copyText,
+  formatText,
   parseMessage,
   renderHtml,
   resultView,
+  savedStatus,
+  type CopyFormat,
   type RenderMessage,
   type View
 } from './results-model';
 
 const COPIED_MESSAGE_MS = 3000;
+
+const EXPORT_FORMATS: Array<vscode.QuickPickItem & {format: CopyFormat; extension: string}> = [
+  {label: 'CSV', format: 'csv', extension: 'csv'},
+  {label: 'JSON', format: 'json', extension: 'json'},
+  {label: 'Markdown', format: 'markdown', extension: 'md'}
+];
 
 export type RunOutcome =
   | {kind: 'ok'}
@@ -101,8 +112,48 @@ export class ResultsPanel implements vscode.Disposable {
         } else if (message.resultId !== this.result?.id) {
           vscode.window.setStatusBarMessage('The results changed. Copy again.', COPIED_MESSAGE_MS);
         }
+        return;
       }
+      case 'export':
+        await this.export(message.resultId);
     }
+  }
+
+  /** Saves the rows in query order. A run that ends during the dialogs does not change them. */
+  private async export(resultId: string): Promise<void> {
+    const result = this.result;
+    if (result?.id !== resultId) {
+      vscode.window.setStatusBarMessage('The results changed. Export again.', COPIED_MESSAGE_MS);
+      return;
+    }
+    const picked = await vscode.window.showQuickPick(EXPORT_FORMATS, {
+      placeHolder: 'Select the export format'
+    });
+    if (!picked) return;
+    const folder = vscode.workspace.workspaceFolders?.[0]?.uri ?? vscode.Uri.file(homedir());
+    const uri = await vscode.window.showSaveDialog({
+      defaultUri: vscode.Uri.joinPath(folder, `dynotable-results.${picked.extension}`)
+    });
+    if (!uri) return;
+    const {rows, columns} = result.value;
+    const text = formatText(
+      result.value,
+      [...rows.keys()],
+      [...columns.keys()],
+      picked.format,
+      true
+    );
+    try {
+      await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(text));
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      void vscode.window.showErrorMessage(`The rows were not saved: ${reason}`);
+      return;
+    }
+    vscode.window.setStatusBarMessage(
+      savedStatus(rows.length, posix.basename(uri.path)),
+      COPIED_MESSAGE_MS
+    );
   }
 
   /** Closing the panel cancels the run. */

@@ -46,6 +46,12 @@ export const quickPicks: {
   answer: undefined
 };
 
+/** The `window.showSaveDialog` stub returns `answer` and keeps the last call's `defaultUri`. */
+export const saveDialogs: {answer: vscode.Uri | undefined; defaultUri: vscode.Uri | undefined} = {
+  answer: undefined,
+  defaultUri: undefined
+};
+
 /** Every string written to an output channel created while the stub is in place. */
 export const channelText: string[] = [];
 
@@ -66,6 +72,10 @@ export function stubWindow(): void {
     quickPicks.shown.push(resolved);
     await quickPicks.during?.();
     return resolved.find((item) => item.label === quickPicks.answer);
+  };
+  window.showSaveDialog = (options?: vscode.SaveDialogOptions) => {
+    saveDialogs.defaultUri = options?.defaultUri;
+    return Promise.resolve(saveDialogs.answer);
   };
   const create = vscode.window.createOutputChannel.bind(vscode.window) as (
     ...args: unknown[]

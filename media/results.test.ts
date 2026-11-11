@@ -42,14 +42,16 @@ describe('results webview', () => {
   });
 
   // The host copies only from the result the id names, so a stale button copies nothing.
-  it('copies CSV and JSON with the id of the result it shows', () => {
+  it('copies and exports with the id of the result it shows', () => {
     render({kind: 'result', resultId: 'copy-1', summary: '0 rows', columns: [], cells: []});
     const buttons = [...document.querySelectorAll('button')];
     buttons.find((node) => node.textContent === 'Copy CSV')?.click();
     buttons.find((node) => node.textContent === 'Copy JSON')?.click();
-    expect(posted.slice(-2)).toEqual([
+    buttons.find((node) => node.textContent === 'Export…')?.click();
+    expect(posted.slice(-3)).toEqual([
       {type: 'copy', resultId: 'copy-1', format: 'csv'},
-      {type: 'copy', resultId: 'copy-1', format: 'json'}
+      {type: 'copy', resultId: 'copy-1', format: 'json'},
+      {type: 'export', resultId: 'copy-1'}
     ]);
   });
 
