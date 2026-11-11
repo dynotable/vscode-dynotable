@@ -347,18 +347,23 @@ button:hover { background: var(--vscode-button-hoverBackground); }
 table { table-layout: fixed; border-collapse: separate; border-spacing: 0; font-family: var(--vscode-editor-font-family); }
 th, td { padding: 2px 6px; border-right: 1px solid var(--vscode-panel-border); border-bottom: 1px solid var(--vscode-panel-border); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 th { position: sticky; top: 0; z-index: 2; background: var(--vscode-editor-background); cursor: pointer; }
+.head { display: flex; align-items: center; }
+.head .name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sort, .filter { flex: none; }
 .sort { margin-left: 4px; }
 .resize { position: absolute; top: 0; right: 0; width: 5px; height: 100%; cursor: col-resize; }
-tbody tr:nth-child(even) { background: var(--vscode-keybindingTable-rowsBackground, var(--vscode-list-hoverBackground)); }
+tbody tr:nth-child(even) { --stripe: var(--vscode-keybindingTable-rowsBackground, var(--vscode-list-hoverBackground)); background: var(--stripe); }
+td { background: var(--hl, transparent); }
 .rownum { position: sticky; left: 0; z-index: 1; background: var(--vscode-editor-background); color: var(--vscode-editorLineNumber-foreground); text-align: right; }
 th.rownum { z-index: 3; cursor: default; }
 td.null, td.json { color: var(--vscode-descriptionForeground); }
 td.number { text-align: right; }
 .pinned { position: sticky; z-index: 1; background: var(--vscode-editor-background); }
 th.pinned { z-index: 3; }
-td.match { background: var(--vscode-editor-findMatchHighlightBackground); }
-td.selected { background: var(--vscode-list-inactiveSelectionBackground); color: var(--vscode-list-inactiveSelectionForeground, inherit); }
-.grid:focus td.selected { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
+td.match { --hl: var(--vscode-editor-findMatchHighlightBackground); }
+td.selected { --hl: var(--vscode-list-inactiveSelectionBackground); color: var(--vscode-list-inactiveSelectionForeground, inherit); }
+.grid:focus td.selected { --hl: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
+td.pinned, td.rownum { background: linear-gradient(var(--hl, transparent), var(--hl, transparent)), linear-gradient(var(--stripe, transparent), var(--stripe, transparent)), var(--vscode-editor-background); }
 td.focused { outline: 1px solid var(--vscode-list-focusOutline, var(--vscode-focusBorder)); outline-offset: -1px; }
 input { user-select: text; color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); }
 input.find { width: 160px; padding: 2px 4px; }
@@ -388,5 +393,5 @@ pre.viewer { user-select: text; max-height: 60vh; overflow: auto; margin: 0 0 8p
 .tok-literal { color: var(--vscode-debugTokenExpression-boolean); }
 table.record { margin-bottom: 8px; }
 table.record th { position: static; cursor: default; }
-table.record td { max-width: 480px; }
+table.record .value { max-width: 480px; overflow: hidden; text-overflow: ellipsis; }
 `;

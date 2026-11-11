@@ -56,10 +56,6 @@ const features = tableFeatures({
   sortedRowModel: createSortedRowModel()
 });
 
-interface GridRow {
-  cells: Cell[];
-}
-
 /** An original row index and a column index, so a cell keeps its place through a sort or a move. */
 interface Point {
   row: number;
@@ -74,7 +70,7 @@ interface FindFilter {
 /** The view state of one result. A new `resultId` gets a new one, so all of it resets. */
 interface Grid {
   view: ResultView;
-  table: Table<typeof features, GridRow>;
+  table: Table<typeof features, Cell[]>;
   /** The `fitWidth` sizes, for Reset Column Widths. */
   fitSizing: Record<string, number>;
   rowNumberWidth: number;
@@ -112,6 +108,8 @@ let suppressClick = false;
 /** The open menu or column filter popup; at most one is open. */
 let popup: HTMLElement | undefined;
 let dialog: HTMLDialogElement | undefined;
+/** The column whose filter popup this mousedown closed, so the click on its icon does not reopen it. */
+let closedFilter: string | undefined;
 
 /** On macOS a Ctrl-click is a right-click, so Cmd adds there. */
 const MAC = navigator.platform.startsWith('Mac');
@@ -166,7 +164,7 @@ function charWidth(): number {
 function createGrid(view: ResultView): Grid {
   const width = charWidth();
   const columnSizing: Record<string, number> = {};
-  const columns: ColumnDef<typeof features, GridRow>[] = view.columns.map((name, index) => {
+  const columns: ColumnDef<typeof features, Cell[]>[] = view.columns.map((name, index) => {
     const cells = view.cells.map((row) => row[index] ?? MISSING);
     const numeric = isNumericColumn(cells);
     const chars = fitWidth(
@@ -177,27 +175,27 @@ function createGrid(view: ResultView): Grid {
     return {
       id: String(index),
       header: name,
-      accessorFn: (row: GridRow) => {
-        const cell = row.cells[index];
+      accessorFn: (row: Cell[]) => {
+        const cell = row[index];
         return cell && !isEmpty(cell) ? cell : undefined;
       },
       sortUndefined: 'last',
       sortDescFirst: false,
       sortFn: (a, b, id) => compareCells(a.getValue<Cell>(id), b.getValue<Cell>(id), numeric),
       filterFn: (row, id, filter: ValueSet) =>
-        inValueSet(row.original.cells[Number(id)] ?? MISSING, filter)
+        inValueSet(row.original[Number(id)] ?? MISSING, filter)
     };
   });
   const table = constructTable({
     features,
     columns,
-    data: view.cells.map((cells) => ({cells})),
+    data: view.cells,
     enableMultiSort: false,
     globalFilterFn: (row, id, filter: FindFilter) =>
-      cellMatches(row.original.cells[Number(id)]?.text ?? '', filter.query),
+      cellMatches(row.original[Number(id)]?.text ?? '', filter.query),
     // The default reads the first row's value, and skips a column whose first cell is missing.
     getColumnCanGlobalFilter: (column) =>
-      (column as unknown as Column<typeof features, GridRow>).getIsVisible(),
+      (column as unknown as Column<typeof features, Cell[]>).getIsVisible(),
     initialState: {columnSizing}
   });
   const digits = String(view.cells.length).length;
@@ -288,6 +286,7 @@ const SORT_MARK = {asc: '▲', desc: '▼'};
 function rebuildTable(): void {
   if (!grid || !scrollBox) return;
   const {table, view, rowNumberWidth} = grid;
+  // The view order. `getVisibleLeafColumns()` does not put the pinned columns first; this does.
   const headers = table.getHeaderGroups()[0]?.headers ?? [];
   const rows = table.getRowModel().rows;
 
@@ -307,12 +306,14 @@ function rebuildTable(): void {
     const sorted = column.getIsSorted();
     const th = element('th', undefined, column.getIsPinned() ? 'pinned' : undefined);
     th.dataset.column = column.id;
-    th.append(
+    // Only the name shrinks, so a narrow column keeps its sort mark and filter icon.
+    const head = element('div', undefined, 'head');
+    head.append(
       element('span', view.columns[Number(column.id)] ?? '', 'name'),
       element('span', sorted ? SORT_MARK[sorted] : '', 'sort'),
-      filterIcon(column.id, column.getIsFiltered()),
-      element('span', undefined, 'resize')
+      filterIcon(column.id, column.getIsFiltered())
     );
+    th.append(head, element('span', undefined, 'resize'));
     th.addEventListener('click', (event) => {
       if (suppressClick) return;
       column.getToggleSortingHandler()?.(event);
@@ -329,7 +330,7 @@ function rebuildTable(): void {
     tr.dataset.row = String(row.index);
     tr.append(element('td', String(position + 1), 'rownum'));
     for (const {column} of headers) {
-      const cell = row.original.cells[Number(column.id)] ?? MISSING;
+      const cell = row.original[Number(column.id)] ?? MISSING;
       const td = element('td', cell.text, cell.kind);
       if (column.getIsPinned()) td.classList.add('pinned');
       td.dataset.row = String(row.index);
@@ -374,37 +375,31 @@ function anchorOr(point: Point): Point {
 }
 
 /** `extend` selects the range from the anchor; `add` keeps the old selection. */
-function selectCell(point: Point, extend: boolean, add: boolean): void {
+function select(point: Point, extend: boolean, add: boolean, wholeRows: boolean): void {
   if (!grid) return;
   const from = extend ? anchorOr(point) : point;
   const rows = between(grid.viewRows, from.row, point.row);
-  const columns = between(grid.viewColumns, from.column, point.column);
+  const columns = wholeRows ? [] : between(grid.viewColumns, from.column, point.column);
   if (add) {
     for (const row of rows) grid.selection.rows.add(row);
     for (const column of columns) grid.selection.columns.add(column);
-  } else grid.selection = {rows: new Set(rows), columns: new Set(columns), wholeRows: false};
+    grid.selection.wholeRows ||= wholeRows;
+  } else grid.selection = {rows: new Set(rows), columns: new Set(columns), wholeRows};
   grid.focus = point;
   if (!extend) grid.anchor = point;
   paint();
 }
 
+const selectCell = (point: Point, extend: boolean, add: boolean) =>
+  select(point, extend, add, false);
+
 function selectRow(row: number, extend: boolean, add: boolean): void {
-  if (!grid) return;
-  const focusColumn = grid.focus?.column;
+  const focusColumn = grid?.focus?.column;
   const column =
-    focusColumn !== undefined && grid.viewColumns.includes(focusColumn)
+    focusColumn !== undefined && grid?.viewColumns.includes(focusColumn)
       ? focusColumn
-      : grid.viewColumns[0];
-  if (column === undefined) return;
-  const point = {row, column};
-  const rows = between(grid.viewRows, (extend ? anchorOr(point) : point).row, row);
-  if (add) {
-    for (const each of rows) grid.selection.rows.add(each);
-    grid.selection.wholeRows = true;
-  } else grid.selection = {rows: new Set(rows), columns: new Set(), wholeRows: true};
-  grid.focus = point;
-  if (!extend) grid.anchor = point;
-  paint();
+      : grid?.viewColumns[0];
+  if (column !== undefined) select({row, column}, extend, add, true);
 }
 
 function selectAll(): void {
@@ -507,16 +502,12 @@ function findControls(query: string): HTMLElement[] {
   });
   findInput = input;
 
-  const box = element('input');
-  box.type = 'checkbox';
-  box.checked = filterRows;
+  const {box, label} = checkbox('Filter rows', filterRows);
   box.addEventListener('change', () => {
     filterRows = box.checked;
     setFindFilter();
     rebuildTable();
   });
-  const label = element('label');
-  label.append(box, 'Filter rows');
 
   rowsNote = element('span', undefined, 'note');
   rowsNote.hidden = true;
@@ -559,7 +550,10 @@ function fullOrder(current: Grid): string[] {
   return [...order.filter((id) => ids.includes(id)), ...ids.filter((id) => !order.includes(id))];
 }
 
-/** Pinned columns come first whatever `columnOrder` says, so each group reorders on its own. */
+/**
+ * Pinned columns come first, in `columnPinning.start` order, whatever `columnOrder` says. So a move
+ * inside the pinned group writes `start`, and a move across the group boundary is refused.
+ */
 function reorder(source: string, target: string): void {
   if (!grid) return;
   const {table} = grid;
@@ -630,13 +624,19 @@ function closePopup(): void {
   if (scrollBox?.isConnected) scrollBox.focus({preventScroll: true});
 }
 
+/** Chromium fires `close` later, so the node goes now. */
+function closeDialog(): void {
+  const open = dialog;
+  dialog = undefined;
+  open?.close();
+  open?.remove();
+}
+
 /** A render that changes the kind or the `resultId` closes everything, with no focus move. */
 function closeAll(): void {
   popup?.remove();
   popup = undefined;
-  const open = dialog;
-  dialog = undefined;
-  open?.close();
+  closeDialog();
 }
 
 /** Fixed at the given point, moved left and up when it would leave the window. */
@@ -701,10 +701,7 @@ function openMenu(entries: (MenuItem | 'separator')[], x: number, y: number): vo
 /** One dialog at a time: opening one closes the one before. */
 function openDialog(title: string, body: HTMLElement, buttons: HTMLButtonElement[]): void {
   closePopup();
-  const old = dialog;
-  dialog = undefined;
-  old?.close();
-  old?.remove();
+  closeDialog();
   const node = element('dialog');
   const actions = element('div', undefined, 'actions');
   actions.append(
@@ -749,7 +746,9 @@ function openRecord(row: number): void {
   table.append(head);
   for (const column of grid.viewColumns) {
     const cell = cellAt(row, column);
-    const value = element('td', cell.text, cell.kind);
+    // An auto-layout table ignores a cell's max-width, so the width goes on a block in the cell.
+    const value = element('td', undefined, cell.kind);
+    value.append(element('div', cell.text, 'value'));
     value.addEventListener('dblclick', () => openViewer({row, column}));
     const tr = element('tr');
     tr.append(element('td', columnName(column)), value);
@@ -787,7 +786,7 @@ function sortBy(id: string, desc: boolean | undefined): void {
   rebuildTable();
 }
 
-/** Unpin puts the column at the start of the unpinned columns. */
+/** `column.pin(false)` puts the column back at its old `columnOrder` place; Unpin puts it first. */
 function pin(id: string, pinned: boolean): void {
   if (!grid) return;
   const column = grid.table.getColumn(id);
@@ -927,7 +926,7 @@ function onContextMenu(event: MouseEvent): void {
       paint();
     } else selectCell(point, false, false);
     openCellMenu(point, event.clientX, event.clientY);
-  }
+  } else if (target.closest('.rownum')) event.preventDefault();
 }
 
 function setColumnFilter(id: string, filter: ValueSet | undefined): void {
@@ -1008,6 +1007,7 @@ function openFilter(id: string, x: number, y: number): void {
   );
 
   const node = element('div', undefined, 'popup');
+  node.dataset.filter = id;
   node.append(search, all.label, list, actions);
   node.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') closePopup();
@@ -1021,6 +1021,7 @@ function filterIcon(id: string, filtered: boolean): HTMLElement {
   icon.title = 'Filter';
   icon.addEventListener('click', (event) => {
     event.stopPropagation();
+    if (closedFilter === id) return;
     const {left, bottom} = icon.getBoundingClientRect();
     openFilter(id, left, bottom);
   });
@@ -1156,7 +1157,11 @@ document.addEventListener('mouseup', (event) => {
 });
 
 document.addEventListener('mousedown', (event) => {
-  if (popup && !(event.target instanceof Node && popup.contains(event.target))) closePopup();
+  closedFilter = undefined;
+  if (popup && !(event.target instanceof Node && popup.contains(event.target))) {
+    closedFilter = popup.dataset.filter;
+    closePopup();
+  }
 });
 
 window.addEventListener('blur', () => {
