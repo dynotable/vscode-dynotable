@@ -469,15 +469,15 @@ scripts outside the repository.
 
 - Modify: `src/grid-model.ts`, `src/grid-model.test.ts`
 
-- [ ] add `jsonTokens(text)`: key, string, number, literal (`true`, `false`, `null`) and punctuation
+- [x] add `jsonTokens(text)`: key, string, number, literal (`true`, `false`, `null`) and punctuation
       tokens, whitespace kept
-- [ ] add `prettyText(text, kind)`: re-indent with `jsonTokens` (2 spaces) for a `json` cell and for a
+- [x] add `prettyText(text, kind)`: re-indent with `jsonTokens` (2 spaces) for a `json` cell and for a
       string that parses to an object or an array; else the text as is
-- [ ] test `jsonTokens`: a string value holding `\"` and `":` stays one string token; the tokens join
+- [x] test `jsonTokens`: a string value holding `\"` and `":` stays one string token; the tokens join
       back to the input
-- [ ] test `prettyText` with `kind: 'string'`: `{"id":12345678901234567890,"v":1.0}` keeps both
+- [x] test `prettyText` with `kind: 'string'`: `{"id":12345678901234567890,"v":1.0}` keeps both
       numbers as written and is indented; a plain string comes back unchanged
-- [ ] run `pnpm typecheck` and `pnpm test` - must pass before task 4
+- [x] run `pnpm typecheck` and `pnpm test` - must pass before task 4
 
 ### Task 4: Add the host copy builders
 

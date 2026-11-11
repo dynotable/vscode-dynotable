@@ -7,6 +7,8 @@ import {
   distinctValues,
   inValueSet,
   isNumericColumn,
+  jsonTokens,
+  prettyText,
   totals
 } from './grid-model';
 
@@ -114,5 +116,54 @@ describe('totals', () => {
   // Sum 0 and Avg NaN would show for a column of text.
   it('gives no totals without a number', () => {
     expect(totals(cellsOf('a', null))).toBeUndefined();
+  });
+});
+
+describe('jsonTokens', () => {
+  // A string that ends at an escaped quote splits `"x\":y"` and reads `:` as a key separator; a
+  // tokenizer that drops whitespace cannot give the highlighted text back as it was written.
+  it('keeps an escaped quote inside one string token and keeps the whitespace', () => {
+    const text = '{"a": "x\\":y", "b":[-1.5e3,true]}';
+    const tokens = jsonTokens(text);
+    expect(tokens).toEqual([
+      {kind: 'punctuation', text: '{'},
+      {kind: 'key', text: '"a"'},
+      {kind: 'punctuation', text: ':'},
+      {kind: 'space', text: ' '},
+      {kind: 'string', text: '"x\\":y"'},
+      {kind: 'punctuation', text: ','},
+      {kind: 'space', text: ' '},
+      {kind: 'key', text: '"b"'},
+      {kind: 'punctuation', text: ':'},
+      {kind: 'punctuation', text: '['},
+      {kind: 'number', text: '-1.5e3'},
+      {kind: 'punctuation', text: ','},
+      {kind: 'literal', text: 'true'},
+      {kind: 'punctuation', text: ']'},
+      {kind: 'punctuation', text: '}'}
+    ]);
+    expect(tokens.map((token) => token.text).join('')).toBe(text);
+  });
+});
+
+describe('prettyText', () => {
+  // `JSON.stringify(JSON.parse(text))` rounds 12345678901234567890 and writes 1.0 as 1.
+  it('indents a JSON string as written', () => {
+    expect(prettyText('{"id":12345678901234567890,"v":1.0}', 'string')).toBe(
+      '{\n  "id": 12345678901234567890,\n  "v": 1.0\n}'
+    );
+  });
+
+  // `JSON.stringify(value, null, 2)` writes an empty object or array on one line.
+  it('writes the empty containers of a json cell on one line', () => {
+    expect(prettyText('{"a":[],"o":{},"n":[1]}', 'json')).toBe(
+      '{\n  "a": [],\n  "o": {},\n  "n": [\n    1\n  ]\n}'
+    );
+  });
+
+  // Text that is not a JSON object or array must not lose its spaces or gain line breaks.
+  it('gives other text back unchanged', () => {
+    expect(prettyText('id: 1, v: 2', 'string')).toBe('id: 1, v: 2');
+    expect(prettyText(' 1.0 ', 'string')).toBe(' 1.0 ');
   });
 });

@@ -116,3 +116,64 @@ export function fitWidth(headerLength: number, cellLengths: number[]): number {
     PADDING
   );
 }
+
+export type JsonTokenKind = 'key' | 'string' | 'number' | 'literal' | 'punctuation' | 'space';
+
+export interface JsonToken {
+  kind: JsonTokenKind;
+  text: string;
+}
+
+/** The last group takes any other character, so the tokens always join back to the input. */
+const JSON_TOKEN =
+  /(\s+)|("(?:[^"\\]|\\.)*")(?=\s*:)|("(?:[^"\\]|\\.)*"?)|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|(true|false|null)|([^])/y;
+
+const TOKEN_KINDS: JsonTokenKind[] = ['space', 'key', 'string', 'number', 'literal', 'punctuation'];
+
+export function jsonTokens(text: string): JsonToken[] {
+  const tokens: JsonToken[] = [];
+  JSON_TOKEN.lastIndex = 0;
+  for (let match = JSON_TOKEN.exec(text); match; match = JSON_TOKEN.exec(text)) {
+    const group = match.findIndex((part, index) => index > 0 && part !== undefined);
+    tokens.push({kind: TOKEN_KINDS[group - 1] ?? 'punctuation', text: match[0]});
+  }
+  return tokens;
+}
+
+function isJsonContainer(text: string): boolean {
+  try {
+    const value: unknown = JSON.parse(text);
+    return typeof value === 'object' && value !== null;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Re-indents the original text, as `JSON.stringify(value, null, 2)` lays it out. It never prints a
+ * parsed value, so a big number, `1.0` and a duplicate key stay as written.
+ */
+export function prettyText(text: string, kind: CellKind): string {
+  if (kind !== 'json' && !(kind === 'string' && isJsonContainer(text))) return text;
+  const tokens = jsonTokens(text).filter((token) => token.kind !== 'space');
+  let out = '';
+  let depth = 0;
+  const newline = () => `\n${'  '.repeat(depth)}`;
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i]?.text ?? '';
+    const next = tokens[i + 1]?.text;
+    if ((token === '{' && next === '}') || (token === '[' && next === ']')) {
+      out += token + next;
+      i++;
+    } else if (token === '{' || token === '[') {
+      depth++;
+      out += token + newline();
+    } else if (token === '}' || token === ']') {
+      depth--;
+      out += newline() + token;
+    } else if (token === ',') out += token + newline();
+    else if (token === ':') out += ': ';
+    else out += token;
+  }
+  return out;
+}
