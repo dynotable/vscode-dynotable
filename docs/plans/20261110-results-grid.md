@@ -680,11 +680,11 @@ scripts outside the repository.
 
 - Modify: `README.md`, `CHANGELOG.md`
 
-- [ ] README › Use it: rewrite the **Results.** bullet for the grid (sort, find and filters, cell
+- [x] README › Use it: rewrite the **Results.** bullet for the grid (sort, find and filters, cell
       selection, copy as TSV, CSV, JSON or Markdown, export, totals, pinned columns, value viewer,
       Record View) and keep its row limit at 500
-- [ ] CHANGELOG: add an `## Unreleased` entry for the grid and the removed statement block
-- [ ] run `pnpm lint`
+- [x] CHANGELOG: add an `## Unreleased` entry for the grid and the removed statement block
+- [x] run `pnpm lint`
 
 ### Task 11: Verify acceptance criteria
 

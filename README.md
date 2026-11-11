@@ -88,9 +88,16 @@ Query do this for you. A target name that contains a space cannot be written the
   Linux), or run **DynoTable: Run**. Run uses the
   selection. With no selection, it uses the statement at the cursor, or else the whole file. An
   OpenSearch query runs the selection or the whole file.
-- **Results.** One panel shows the rows of the last run. It shows the total only when DynoTable
-  knows it. A run returns up to 500 rows. **Copy CSV** and **Copy JSON** copy the rows. **Cancel**
-  stops the run. Closing the panel also stops it. You can run one statement at a time.
+- **Results.** One panel shows the rows of the last run in a grid. It shows the total only when
+  DynoTable knows it. A run returns up to 500 rows. Click a header to sort. **Find** (Cmd+F or
+  Ctrl+F) highlights the cells that match, and **Filter rows** hides the other rows. The filter icon
+  in a header filters the column by its values. Click, Shift-click or Cmd-click (Ctrl-click) to
+  select cells. Cmd+C (Ctrl+C) copies them as tab-separated text. Right-click a cell to copy the
+  selection as CSV, JSON or Markdown, or to open **Record View**. Right-click a header to sort, pin
+  or hide its column. Double-click a cell to see its full value. The line under the grid shows the
+  count, sum, average, minimum and maximum of the selected cells. **Copy CSV**, **Copy JSON** and
+  **Export…** copy or save all rows. **Cancel** stops the run. Closing the panel also stops it. You
+  can run one statement at a time.
 - **Open in DynoTable.** Click the **Open in DynoTable** lens, or press Cmd+Shift+Enter
   (Ctrl+Shift+Enter) with the cursor in the statement. SQL and PartiQL only.
 - **Explorer.** The DynoTable icon in the activity bar opens it. It shows your DynamoDB tables and,
