@@ -11,13 +11,15 @@ export interface ValueSet {
   values: Set<string>;
 }
 
+export const MISSING: Cell = {text: '', kind: 'missing'};
+
 /**
  * A column is a literal key, never a path: `o.orderId` is one key. An inherited key such as
  * `toString` is not a value. A tagged value such as `{"N": …}` stays `json`, so its exact text never
  * becomes a lossy number.
  */
 export function cellKind(row: Record<string, unknown>, column: string): Cell {
-  if (!Object.hasOwn(row, column)) return {text: '', kind: 'missing'};
+  if (!Object.hasOwn(row, column)) return MISSING;
   const value = row[column];
   if (value === null) return {text: 'null', kind: 'null'};
   if (typeof value === 'number') return {text: String(value), kind: 'number'};
@@ -114,6 +116,15 @@ export interface GridSelection {
   columns: Set<number>;
   wholeRows: boolean;
 }
+
+export const emptySelection = (): GridSelection => ({
+  rows: new Set(),
+  columns: new Set(),
+  wholeRows: false
+});
+
+export const isSelected = (selection: GridSelection, row: number, column: number) =>
+  selection.rows.has(row) && (selection.wholeRows || selection.columns.has(column));
 
 /** The selected rows and columns that are shown, in view order; both empty when no cell is. */
 export function selectionCells(

@@ -24,11 +24,14 @@ import {
   cellMatches,
   compareCells,
   distinctValues,
+  emptySelection,
   fitWidth,
   inValueSet,
   isEmpty,
   isNumericColumn,
+  isSelected,
   jsonTokens,
+  MISSING,
   prettyText,
   selectionCells,
   totals,
@@ -36,7 +39,7 @@ import {
   type GridSelection,
   type ValueSet
 } from '../src/grid-model';
-import type {PanelMessage, ResultView, View} from '../src/results-model';
+import type {CopyFormat, PanelMessage, ResultView, View} from '../src/results-model';
 
 declare function acquireVsCodeApi(): {postMessage(message: PanelMessage): void};
 
@@ -118,7 +121,6 @@ const addModifier = (event: MouseEvent | KeyboardEvent) => (MAC ? event.metaKey 
 const MIN_WIDTH = 60;
 const MAX_WIDTH = 400;
 const TOOLTIP_LENGTH = 2000;
-const MISSING: Cell = {text: '', kind: 'missing'};
 const FIND_DELAY = 150;
 const DRAG_THRESHOLD = 4;
 const ARROWS: Record<string, [number, number]> = {
@@ -204,7 +206,7 @@ function createGrid(view: ResultView): Grid {
     table,
     fitSizing: columnSizing,
     rowNumberWidth: (Math.max(digits, 2) + 2) * width,
-    selection: {rows: new Set(), columns: new Set(), wholeRows: false},
+    selection: emptySelection(),
     query: '',
     viewRows: [],
     viewColumns: []
@@ -229,7 +231,7 @@ function keepFocusShown(oldRows: number[], oldColumns: number[]): void {
   const row = nearest(oldRows, grid.focus.row, grid.viewRows);
   const column = nearest(oldColumns, grid.focus.column, grid.viewColumns);
   if (row === undefined || column === undefined) {
-    grid.selection = {rows: new Set(), columns: new Set(), wholeRows: false};
+    grid.selection = emptySelection();
     grid.focus = undefined;
     grid.anchor = undefined;
   } else grid.focus = {row, column};
@@ -266,10 +268,7 @@ function paint(): void {
   for (const td of scrollBox.querySelectorAll<HTMLElement>('td[data-column]')) {
     const row = Number(td.dataset.row);
     const column = Number(td.dataset.column);
-    td.classList.toggle(
-      'selected',
-      selection.rows.has(row) && (selection.wholeRows || selection.columns.has(column))
-    );
+    td.classList.toggle('selected', isSelected(selection, row, column));
     td.classList.toggle('focused', focus?.row === row && focus.column === column);
     td.classList.toggle('match', query !== '' && cellMatches(cellAt(row, column).text, query));
   }
@@ -608,8 +607,8 @@ function onGridKey(event: KeyboardEvent): void {
 function showTooltip(event: MouseEvent): void {
   const td = (event.target as Element).closest('td.json');
   if (!(td instanceof HTMLElement) || td.title || !grid) return;
-  const cell = grid.view.cells[Number(td.dataset.row)]?.[Number(td.dataset.column)];
-  if (cell) td.title = prettyText(cell.text, 'json').slice(0, TOOLTIP_LENGTH);
+  const cell = cellAt(Number(td.dataset.row), Number(td.dataset.column));
+  td.title = prettyText(cell.text, 'json').slice(0, TOOLTIP_LENGTH);
 }
 
 const columnName = (column: number) => grid?.view.columns[column] ?? '';
@@ -839,7 +838,7 @@ function openCellMenu(point: Point, x: number, y: number): void {
   const current = grid;
   const {resultId} = current.view;
   const {row, column} = point;
-  const copySelection = (format: 'csv' | 'json' | 'markdown') => () => {
+  const copySelection = (format: Exclude<CopyFormat, 'tsv'>) => () => {
     const {rows, columns} = selectionCells(
       current.selection,
       current.viewRows,
@@ -917,11 +916,7 @@ function onContextMenu(event: MouseEvent): void {
   } else if (td instanceof HTMLElement) {
     event.preventDefault();
     const point = {row: Number(td.dataset.row), column: Number(td.dataset.column)};
-    const {selection} = grid;
-    if (
-      selection.rows.has(point.row) &&
-      (selection.wholeRows || selection.columns.has(point.column))
-    ) {
+    if (isSelected(grid.selection, point.row, point.column)) {
       grid.focus = point;
       paint();
     } else selectCell(point, false, false);
