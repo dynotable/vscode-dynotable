@@ -105,6 +105,29 @@ export function totals(cells: Cell[]): string | undefined {
   ].join(' · ');
 }
 
+/**
+ * The selected cells are every selected row crossed with every selected column. `rows` are original
+ * row indices; `columns` are column indices. `wholeRows` counts every visible column.
+ */
+export interface GridSelection {
+  rows: Set<number>;
+  columns: Set<number>;
+  wholeRows: boolean;
+}
+
+/** The selected rows and columns that are shown, in view order; both empty when no cell is. */
+export function selectionCells(
+  selection: GridSelection,
+  viewRows: number[],
+  viewColumns: number[]
+): {rows: number[]; columns: number[]} {
+  const rows = viewRows.filter((row) => selection.rows.has(row));
+  const columns = selection.wholeRows
+    ? viewColumns
+    : viewColumns.filter((column) => selection.columns.has(column));
+  return rows.length > 0 && columns.length > 0 ? {rows, columns} : {rows: [], columns: []};
+}
+
 /** The header also holds the sort mark and the filter icon. */
 const HEADER_EXTRA = 3;
 const PADDING = 2;

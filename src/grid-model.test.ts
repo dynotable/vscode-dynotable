@@ -9,6 +9,7 @@ import {
   isNumericColumn,
   jsonTokens,
   prettyText,
+  selectionCells,
   totals
 } from './grid-model';
 
@@ -116,6 +117,41 @@ describe('totals', () => {
   // Sum 0 and Avg NaN would show for a column of text.
   it('gives no totals without a number', () => {
     expect(totals(cellsOf('a', null))).toBeUndefined();
+  });
+});
+
+const select = (rows: number[], columns: number[], wholeRows = false) => ({
+  rows: new Set(rows),
+  columns: new Set(columns),
+  wholeRows
+});
+
+describe('selectionCells', () => {
+  // Copies follow the view, not the click order. Two cells in different rows and columns select
+  // where they cross, as JetBrains copies them.
+  it('crosses the selected rows and columns in view order', () => {
+    expect(selectionCells(select([1, 2], [0, 2]), [2, 0, 1], [2, 0, 1])).toEqual({
+      rows: [2, 1],
+      columns: [2, 0]
+    });
+  });
+
+  // A row-number click selects the row, so the copy must hold every visible column.
+  it('takes every visible column for whole rows', () => {
+    expect(selectionCells(select([0], [], true), [0, 1], [3, 1])).toEqual({
+      rows: [0],
+      columns: [3, 1]
+    });
+  });
+
+  // An empty column list would copy every row with no field, or fall back to all columns.
+  it('gives no cells when every selected column is hidden', () => {
+    expect(selectionCells(select([0], [2]), [0, 1], [0, 1])).toEqual({rows: [], columns: []});
+  });
+
+  // A copy must not hold a row that the filter hides.
+  it('leaves out a selected row that the filter hides', () => {
+    expect(selectionCells(select([0, 1], [0]), [1], [0])).toEqual({rows: [1], columns: [0]});
   });
 });
 

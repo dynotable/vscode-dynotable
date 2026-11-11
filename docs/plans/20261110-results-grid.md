@@ -604,37 +604,37 @@ scripts outside the repository.
 - Modify: `media/results.ts`, `media/results.test.ts`
 - Modify: `src/results-model.ts` (`STYLE`)
 
-- [ ] add `selectionCells(selection, viewRows, viewColumns)`: selected rows × selected visible columns,
+- [x] add `selectionCells(selection, viewRows, viewColumns)`: selected rows × selected visible columns,
       both in view order; `wholeRows` means all visible columns; hidden rows left out
-- [ ] click, Shift-click and Shift+arrows (range), the add modifier, row-number click (row), arrows
+- [x] click, Shift-click and Shift+arrows (range), the add modifier, row-number click (row), arrows
       (selection follows, `preventDefault`, scroll into view), Cmd/Ctrl+A; the focus rules (mousedown
       focuses the scroll box; no focus move while the find field has it); the selection stored as
       original rows and column ids; a focused cell that stops being shown moves to the nearest shown cell
-- [ ] copy from the `copy` event with `preventDefault` when the scroll box has the focus:
+- [x] copy from the `copy` event with `preventDefault` when the scroll box has the focus:
       `copySelection` (`tsv`, `header: false`), or `copyValue` for one cell; nothing when no selected
       cell is shown
-- [ ] the find field: Cmd/Ctrl+F, `cellMatches` highlight, Enter/Shift+Enter (Enter applies a pending
+- [x] the find field: Cmd/Ctrl+F, `cellMatches` highlight, Enter/Shift+Enter (Enter applies a pending
       query) and Next/Previous, the Filter rows checkbox as TanStack's global filter (visible columns
       only), `N of M rows shown`
-- [ ] the selection totals line, from `totals`
-- [ ] header edge drag resizes (table width follows); header drag reorders; mouse events, no HTML5 drag
+- [x] the selection totals line, from `totals`
+- [x] header edge drag resizes (table width follows); header drag reorders; mouse events, no HTML5 drag
       and drop; a drag suppresses the next click (flag cleared next tick); a drag ends on `buttons === 0`
       and `blur`; a drop across the pinned boundary is refused, inside it reorders `columnPinning.start`
-- [ ] test `selectionCells`: rows and columns added in an order other than view order come out in view
+- [x] test `selectionCells`: rows and columns added in an order other than view order come out in view
       order; two add-clicked cells in different rows and columns give the 2×2 cross; `wholeRows` gives all
       visible columns; a selection whose columns are all hidden gives no cells; a selected row that the
       filter hides is left out
-- [ ] jsdom test: a `copy` event with the focus in the find field is not prevented and posts nothing; with
+- [x] jsdom test: a `copy` event with the focus in the find field is not prevented and posts nothing; with
       the focus on the scroll box it is prevented and posts; keydown `a` with the add modifier in the find
       field is not prevented, and on the scroll box it is (send the modifier the code uses for the
       platform jsdom reports)
-- [ ] jsdom test: mousedown → mousemove → mouseup → click on a header resizes and does not sort; a reorder
+- [x] jsdom test: mousedown → mousemove → mouseup → click on a header resizes and does not sort; a reorder
       whose mouseup is on another header, then a separate click on a header, sorts
-- [ ] jsdom test: Filter rows on, a query that matches a column whose first row is missing keeps the
+- [x] jsdom test: Filter rows on, a query that matches a column whose first row is missing keeps the
       matching rows
-- [ ] jsdom test: the totals line shows for 2 selected number cells of the focused column and not for one
+- [x] jsdom test: the totals line shows for 2 selected number cells of the focused column and not for one
       cell
-- [ ] run `pnpm typecheck`, `pnpm test` and `pnpm build` - must pass before task 9
+- [x] run `pnpm typecheck`, `pnpm test` and `pnpm build` - must pass before task 9
 
 ### Task 9: Add the menus, pinning, the column filter, the viewer and Record View
 

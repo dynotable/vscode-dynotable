@@ -347,9 +347,21 @@ table { table-layout: fixed; border-collapse: separate; border-spacing: 0; font-
 th, td { padding: 2px 6px; border-right: 1px solid var(--vscode-panel-border); border-bottom: 1px solid var(--vscode-panel-border); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 th { position: sticky; top: 0; z-index: 2; background: var(--vscode-editor-background); cursor: pointer; }
 .sort { margin-left: 4px; }
+.resize { position: absolute; top: 0; right: 0; width: 5px; height: 100%; cursor: col-resize; }
 tbody tr:nth-child(even) { background: var(--vscode-keybindingTable-rowsBackground, var(--vscode-list-hoverBackground)); }
 .rownum { position: sticky; left: 0; z-index: 1; background: var(--vscode-editor-background); color: var(--vscode-editorLineNumber-foreground); text-align: right; }
 th.rownum { z-index: 3; cursor: default; }
 td.null, td.json { color: var(--vscode-descriptionForeground); }
 td.number { text-align: right; }
+.pinned { position: sticky; z-index: 1; background: var(--vscode-editor-background); }
+th.pinned { z-index: 3; }
+td.match { background: var(--vscode-editor-findMatchHighlightBackground); }
+td.selected { background: var(--vscode-list-inactiveSelectionBackground); color: var(--vscode-list-inactiveSelectionForeground, inherit); }
+.grid:focus td.selected { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
+td.focused { outline: 1px solid var(--vscode-list-focusOutline, var(--vscode-focusBorder)); outline-offset: -1px; }
+input { user-select: text; color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); }
+input.find { width: 160px; padding: 2px 4px; }
+label { display: flex; gap: 4px; align-items: center; }
+.note, .totals { color: var(--vscode-descriptionForeground); }
+.totals { padding-top: 4px; }
 `;
