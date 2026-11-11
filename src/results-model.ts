@@ -363,6 +363,7 @@ label { display: flex; gap: 4px; align-items: center; }
 .filter:hover { color: var(--vscode-foreground); }
 .filter.active { color: var(--vscode-focusBorder); }
 .menu, .popup { position: fixed; z-index: 10; padding: 4px 0; color: var(--vscode-menu-foreground); background: var(--vscode-menu-background); border: 1px solid var(--vscode-menu-border, var(--vscode-widget-border, transparent)); box-shadow: 0 2px 8px var(--vscode-widget-shadow); }
+.menu { max-height: calc(100vh - 16px); overflow: hidden auto; }
 .menu:focus { outline: none; }
 .menu .item { padding: 2px 16px; cursor: default; }
 .menu .item:hover, .menu .item.active { color: var(--vscode-menu-selectionForeground); background: var(--vscode-menu-selectionBackground); }
@@ -374,14 +375,15 @@ label { display: flex; gap: 4px; align-items: center; }
 .popup label[hidden] { display: none; }
 .actions { display: flex; gap: 8px; justify-content: flex-end; }
 dialog { max-width: 80vw; max-height: 80vh; color: var(--vscode-foreground); background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border)); }
+dialog[open] { display: flex; flex-direction: column; }
+dialog .body { min-height: 0; overflow: auto; margin: 0 0 8px; }
 dialog::backdrop { background: var(--vscode-widget-shadow); }
 dialog .title { font-weight: bold; margin-bottom: 8px; }
-pre.viewer { user-select: text; max-height: 60vh; overflow: auto; margin: 0 0 8px; font-family: var(--vscode-editor-font-family); white-space: pre-wrap; word-break: break-word; }
+pre.viewer { user-select: text; font-family: var(--vscode-editor-font-family); white-space: pre-wrap; word-break: break-word; }
 .tok-key { color: var(--vscode-debugTokenExpression-name); }
 .tok-string { color: var(--vscode-debugTokenExpression-string); }
 .tok-number { color: var(--vscode-debugTokenExpression-number); }
 .tok-literal { color: var(--vscode-debugTokenExpression-boolean); }
-table.record { margin-bottom: 8px; }
 table.record th { position: static; cursor: default; }
 table.record .value { max-width: 480px; overflow: hidden; text-overflow: ellipsis; }
 `;

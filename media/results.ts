@@ -691,6 +691,7 @@ function openMenu(entries: (MenuItem | 'separator')[], x: number, y: number): vo
             : items.length - 1
           : (active + move + items.length) % items.length;
       items.forEach((item, index) => item.classList.toggle('active', index === active));
+      items[active]?.scrollIntoView({block: 'nearest'});
     } else if (event.key === 'Enter') {
       event.preventDefault();
       items[active]?.click();
@@ -710,6 +711,7 @@ function openDialog(title: string, body: HTMLElement, buttons: HTMLButtonElement
     ...buttons,
     action('Close', () => node.close())
   );
+  body.classList.add('body');
   node.append(element('div', title, 'title'), body, actions);
   // Esc closes a modal dialog natively and fires `close` too.
   node.addEventListener('close', () => {
@@ -756,7 +758,10 @@ function openRecord(row: number): void {
     tr.append(element('td', columnName(column)), value);
     table.append(tr);
   }
-  openDialog(`Row ${rowNumber(row)}`, table, []);
+  // A table does not scroll itself, so a block around it does.
+  const box = element('div');
+  box.append(table);
+  openDialog(`Row ${rowNumber(row)}`, box, []);
 }
 
 /** Visibility does not re-run the global filter, so a fresh filter value forces it. */

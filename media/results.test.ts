@@ -628,6 +628,25 @@ describe('results webview', () => {
     expect(document.querySelector('.menu')).toBeNull();
   });
 
+  // A menu in a short panel scrolls; a keyboard highlight below its fold would be invisible.
+  it('scrolls the menu to the item that the keyboard highlights', () => {
+    render(people('menu-scroll'));
+    contextMenu(cell(0, 0));
+    const scrolled: Element[] = [];
+    const stub = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this);
+    };
+    const menu = document.querySelector('.menu') as HTMLElement;
+    try {
+      keydown(menu, {key: 'ArrowUp'});
+    } finally {
+      Element.prototype.scrollIntoView = stub;
+    }
+    expect(scrolled.map((node) => node.textContent)).toEqual(['Record View']);
+    keydown(menu, {key: 'Escape'});
+  });
+
   // A filter left on a hidden column hides rows for a reason the user cannot see.
   it('clears a hidden column filter and disables the menu items that have nothing to act on', () => {
     render(people('column-filter'));
