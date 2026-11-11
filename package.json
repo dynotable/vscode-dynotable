@@ -3,7 +3,7 @@
   "displayName": "DynoTable – DynamoDB & OpenSearch SQL",
   "icon": "media/icon.png",
   "description": "SQL and PartiQL for DynamoDB, SQL and query DSL for OpenSearch, and SQL joins across both. Requires the DynoTable desktop app.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "dynotable",
   "license": "MIT",
   "repository": {
@@ -75,7 +75,11 @@
         ],
         "extensions": [
           ".partiql"
-        ]
+        ],
+        "icon": {
+          "light": "./media/file-light.svg",
+          "dark": "./media/file-dark.svg"
+        }
       },
       {
         "id": "opensearch",
@@ -84,7 +88,11 @@
         ],
         "extensions": [
           ".opensearch"
-        ]
+        ],
+        "icon": {
+          "light": "./media/file-light.svg",
+          "dark": "./media/file-dark.svg"
+        }
       }
     ],
     "grammars": [
@@ -247,6 +255,7 @@
     "gate": "pnpm typecheck && pnpm lint && pnpm test && pnpm test:integration && pnpm cli:build && pnpm cli:binary && pnpm package"
   },
   "dependencies": {
+    "@tanstack/table-core": "9.3.1",
     "semver": "^7.8.5",
     "vscode-languageclient": "11.0.0"
   },

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0 — 2026-11-11
+
+- The results panel shows the rows in a grid. Sort, find and filter the rows, and filter a column
+  by its values. Select cells and copy them as TSV, CSV, JSON or Markdown. Pin, hide, resize and
+  move columns. A line shows the count, sum, average, minimum and maximum of the selected cells in
+  the focused cell's column. Double-click a cell to see its full value, or open Record View to see a
+  row.
+- Export saves all rows to a CSV, JSON or Markdown file.
+- The results panel no longer shows the statement that ran.
+- PartiQL (`.partiql`) and OpenSearch (`.opensearch`) files show the DynoTable file icon.
+
 ## 0.2.0 — 2026-11-09
 
 - `*.dtsql` files are DynoTable SQL files. They attach without a `dynotable.sqlFiles` entry, and

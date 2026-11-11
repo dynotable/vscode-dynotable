@@ -37,7 +37,7 @@ import {Explorer} from './explorer';
 import type {Node} from './explorer-model';
 import {connectTcp, fs, watchPortFile} from './node-seams';
 import type {RequestedProfile} from './profiles';
-import {listTablesSchema} from './protocol';
+import {listTablesSchema, type RunResult} from './protocol';
 import {REASONS, type Action} from './reasons';
 import {ResultsPanel, type RunOutcome} from './results';
 import type {View} from './results-model';
@@ -61,6 +61,7 @@ export interface TestApi {
   panel: {
     receive(message: unknown): Promise<void>;
     view(): View;
+    runResult(): RunResult | undefined;
     outcome(): RunOutcome | undefined;
     close(): void;
   };
@@ -323,6 +324,7 @@ export function activate(context: vscode.ExtensionContext): TestApi | undefined 
     panel: {
       receive: (message) => panel.receive(message),
       view: () => panel.current,
+      runResult: () => panel.runResult,
       outcome: () => panel.last,
       close: () => panel.close()
     },

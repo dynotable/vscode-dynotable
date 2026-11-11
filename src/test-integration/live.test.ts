@@ -315,7 +315,7 @@ describe('live', () => {
     assert.ok(lens?.arguments, JSON.stringify(lenses.map((candidate) => candidate.command)));
     await execute(lens.command, ...lens.arguments);
     assert.deepEqual(toasts, []);
-    assert.equal((await result()).executedStatement, second);
+    assert.equal((await api()).panel.runResult()?.executedStatement, second);
   });
 
   it('@live Pick Index: writes the listed index into the directive', async () => {

@@ -41,6 +41,9 @@ shows: exit codes, signals, and the name that the binary was started under (`dyn
     and the CLI share them.
   - `src/rpc.ts`: the JSON-RPC peer and the one frame parser. The CLI session and the
     `dynotable-cli lsp` bridge use it.
+  - `src/grid-model.ts`: the cell, sort, filter, totals and JSON rules. The host and the results
+    webview (`media/results.ts`) share them. It has no Node.js import, because the webview bundles
+    it.
 - `src/test-integration/`: the integration harness and a fake language server. The fake answers
   from the fixtures in `contract/`.
 - `contract/`: the protocol fixtures. `contract/manifest.json` gives each one's provenance.

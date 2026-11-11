@@ -1,17 +1,30 @@
 import {randomUUID} from 'node:crypto';
+import {homedir} from 'node:os';
+import {posix} from 'node:path';
 import * as vscode from 'vscode';
 import {is, runResultSchema, type RunResult} from './protocol';
 import {
+  allText,
+  copyText,
+  FORMAT_NAMES,
   parseMessage,
   renderHtml,
   resultView,
-  toCsv,
-  toJson,
+  savedStatus,
+  type CopyFormat,
   type RenderMessage,
   type View
 } from './results-model';
 
-const COPIED_MESSAGE_MS = 3000;
+const STATUS_MESSAGE_MS = 3000;
+
+const EXPORT_FORMATS = (
+  [
+    ['csv', 'csv'],
+    ['json', 'json'],
+    ['markdown', 'md']
+  ] satisfies Array<[CopyFormat, string]>
+).map(([format, extension]) => ({label: FORMAT_NAMES[format], format, extension}));
 
 export type RunOutcome =
   | {kind: 'ok'}
@@ -22,7 +35,8 @@ export type RunOutcome =
 export class ResultsPanel implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
   private view: View = {kind: 'empty'};
-  private result: RunResult | undefined;
+  /** Set on success only, so a failed run that restores the old view keeps the old id current. */
+  private result: {value: RunResult; id: string} | undefined;
   private run: {id: string; source: vscode.CancellationTokenSource} | undefined;
   /** The last run's outcome, for the Test-mode hook. */
   last: RunOutcome | undefined;
@@ -32,6 +46,10 @@ export class ResultsPanel implements vscode.Disposable {
 
   get current(): View {
     return this.view;
+  }
+
+  get runResult(): RunResult | undefined {
+    return this.result?.value;
   }
 
   /**
@@ -62,8 +80,8 @@ export class ResultsPanel implements vscode.Disposable {
         this.show(before);
         return (this.last = {kind: 'unreadable'});
       }
-      this.result = answer;
-      this.show(resultView(answer));
+      this.result = {value: answer, id: run.id};
+      this.show(resultView(answer, run.id));
       return (this.last = {kind: 'ok'});
     } catch (error) {
       const cancelled = run.source.token.isCancellationRequested;
@@ -85,16 +103,54 @@ export class ResultsPanel implements vscode.Disposable {
       case 'cancel':
         if (message.runId === this.run?.id) this.run.source.cancel();
         return;
-      case 'copy': {
-        if (!this.result) return;
-        const text = message.format === 'csv' ? toCsv(this.result) : toJson(this.result);
-        await vscode.env.clipboard.writeText(text);
-        vscode.window.setStatusBarMessage(
-          `Copied ${this.result.returnedRows} rows as ${message.format.toUpperCase()}.`,
-          COPIED_MESSAGE_MS
-        );
+      case 'copy':
+      case 'copySelection':
+      case 'copyValue':
+      case 'copyColumn':
+      case 'copyColumnName': {
+        const result = this.result;
+        if (result?.id !== message.resultId) {
+          vscode.window.setStatusBarMessage('The results changed. Copy again.', STATUS_MESSAGE_MS);
+          return;
+        }
+        const copy = copyText(result.value, message);
+        await vscode.env.clipboard.writeText(copy.text);
+        vscode.window.setStatusBarMessage(copy.status, STATUS_MESSAGE_MS);
+        return;
       }
+      case 'export':
+        await this.export(message.resultId);
     }
+  }
+
+  /** Saves the rows in query order. A run that ends during the dialogs does not change them. */
+  private async export(resultId: string): Promise<void> {
+    const result = this.result;
+    if (result?.id !== resultId) {
+      vscode.window.setStatusBarMessage('The results changed. Export again.', STATUS_MESSAGE_MS);
+      return;
+    }
+    const picked = await vscode.window.showQuickPick(EXPORT_FORMATS, {
+      placeHolder: 'Select the export format'
+    });
+    if (!picked) return;
+    const folder = vscode.workspace.workspaceFolders?.[0]?.uri ?? vscode.Uri.file(homedir());
+    const uri = await vscode.window.showSaveDialog({
+      defaultUri: vscode.Uri.joinPath(folder, `dynotable-results.${picked.extension}`)
+    });
+    if (!uri) return;
+    const text = allText(result.value, picked.format);
+    try {
+      await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(text));
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      void vscode.window.showErrorMessage(`The rows were not saved: ${reason}`);
+      return;
+    }
+    vscode.window.setStatusBarMessage(
+      savedStatus(result.value.rows.length, posix.basename(uri.path)),
+      STATUS_MESSAGE_MS
+    );
   }
 
   /** Closing the panel cancels the run. */
@@ -118,7 +174,12 @@ export class ResultsPanel implements vscode.Disposable {
       {viewColumn: vscode.ViewColumn.Beside, preserveFocus: true},
       {enableScripts: true, localResourceRoots: []}
     );
-    panel.webview.onDidReceiveMessage((message: unknown) => this.receive(message));
+    panel.webview.onDidReceiveMessage((message: unknown) => {
+      this.receive(message).catch((error: unknown) => {
+        const reason = error instanceof Error ? error.message : String(error);
+        void vscode.window.showErrorMessage(`The results panel action failed: ${reason}`);
+      });
+    });
     panel.onDidDispose(() => {
       this.panel = undefined;
       this.run?.source.cancel();
