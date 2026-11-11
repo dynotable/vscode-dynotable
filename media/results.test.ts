@@ -1,11 +1,38 @@
 // @vitest-environment jsdom
 import {beforeAll, describe, expect, it} from 'vitest';
-import type {PanelMessage, View} from '../src/results-model';
+import type {Cell} from '../src/grid-model';
+import type {PanelMessage, ResultView, View} from '../src/results-model';
 
 const posted: PanelMessage[] = [];
 
 const render = (view: View) =>
   window.dispatchEvent(new MessageEvent('message', {data: {type: 'render', view}}));
+
+const header = (name: string) =>
+  [...document.querySelectorAll<HTMLElement>('th[data-column]')].find(
+    (th) => th.querySelector('.name')?.textContent === name
+  );
+
+/** The shown texts of one column, top to bottom. */
+const columnTexts = (column: number) =>
+  [...document.querySelectorAll(`td[data-column="${column}"]`)].map((td) => td.textContent);
+
+const number = (n: number): Cell => ({text: String(n), kind: 'number'});
+
+/** Text order sorts `10` before `2`; only a numeric sort gives 2, 9, 10. */
+const amounts = (resultId: string): ResultView => ({
+  kind: 'result',
+  resultId,
+  summary: '5 rows',
+  columns: ['amount'],
+  cells: [
+    [number(10)],
+    [{text: 'null', kind: 'null'}],
+    [number(9)],
+    [{text: '', kind: 'missing'}],
+    [number(2)]
+  ]
+});
 
 beforeAll(async () => {
   Object.assign(globalThis, {
@@ -31,8 +58,8 @@ describe('results webview', () => {
       cells: [[{text: hostile, kind: 'string'}]]
     });
     expect(document.querySelectorAll('img')).toHaveLength(0);
-    expect(document.querySelector('th')?.textContent).toBe(hostile);
-    expect(document.querySelector('td')?.textContent).toBe(hostile);
+    expect(document.querySelector('th[data-column] .name')?.textContent).toBe(hostile);
+    expect(document.querySelector('td[data-column]')?.textContent).toBe(hostile);
   });
 
   it('renders an empty result with no grid', () => {
@@ -53,6 +80,25 @@ describe('results webview', () => {
       {type: 'copy', resultId: 'copy-1', format: 'json'},
       {type: 'export', resultId: 'copy-1'}
     ]);
+  });
+
+  it('sorts a numeric column ascending, then descending with the empty cells last', () => {
+    render(amounts('sort'));
+    header('amount')?.click();
+    expect(columnTexts(0)).toEqual(['2', '9', '10', 'null', '']);
+    header('amount')?.click();
+    expect(columnTexts(0)).toEqual(['10', '9', '2', 'null', '']);
+  });
+
+  // The host renders `running` before each run ends; a failed run restores the old result.
+  it('keeps the sort across a running render and resets it for a new result', () => {
+    render(amounts('kept'));
+    header('amount')?.click();
+    render({kind: 'running', runId: 'r1'});
+    render(amounts('kept'));
+    expect(columnTexts(0)).toEqual(['2', '9', '10', 'null', '']);
+    render(amounts('next'));
+    expect(columnTexts(0)).toEqual(['10', 'null', '9', '', '2']);
   });
 
   // The host acts only on the run the cancel names.

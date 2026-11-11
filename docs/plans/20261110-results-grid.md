@@ -580,21 +580,21 @@ scripts outside the repository.
 - Modify: `media/results.ts`, `media/results.test.ts`
 - Modify: `src/results-model.ts` (`STYLE`)
 
-- [ ] build the TanStack table from the view: index ids with `accessorFn`, the sort settings,
+- [x] build the TanStack table from the view: index ids with `accessorFn`, the sort settings,
       `compareCells` with `isNumericColumn`
-- [ ] render the toolbar and the grid (the focusable scroll box, sticky header, row numbers, striped
+- [x] render the toolbar and the grid (the focusable scroll box, sticky header, row numbers, striped
       rows, typed cells, tooltips on hover, px widths from `fitWidth` and the measured character width,
       the table width, `user-select: none`); reset view state only on a new `resultId`
-- [ ] header click sorts; the table rebuilds on sort, filter, order, visibility and pin changes only; a
+- [x] header click sorts; the table rebuilds on sort, filter, order, visibility and pin changes only; a
       render that changes the kind or the `resultId` closes open menus, popups and dialogs
-- [ ] update `STYLE` with `--vscode-*` colours only
-- [ ] point the hostile-text test at a data cell (not the row-number cell); keep the empty, cancel and
+- [x] update `STYLE` with `--vscode-*` colours only
+- [x] point the hostile-text test at a data cell (not the row-number cell); keep the empty, cancel and
       ready tests
-- [ ] jsdom test: one header click sorts a numeric column ascending; a second click puts the `null` and
+- [x] jsdom test: one header click sorts a numeric column ascending; a second click puts the `null` and
       the missing value last
-- [ ] jsdom test: render result A, then `running`, then A again: the sort is kept; a new `resultId`
+- [x] jsdom test: render result A, then `running`, then A again: the sort is kept; a new `resultId`
       resets it
-- [ ] run `pnpm typecheck`, `pnpm test` and `pnpm build` - must pass before task 8
+- [x] run `pnpm typecheck`, `pnpm test` and `pnpm build` - must pass before task 8
 
 ### Task 8: Add cell selection, keys, copy, find, resize, reorder and totals
 

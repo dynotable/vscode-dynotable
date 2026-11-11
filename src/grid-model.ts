@@ -26,7 +26,7 @@ export function cellKind(row: Record<string, unknown>, column: string): Cell {
   return {text: JSON.stringify(value), kind: 'json'};
 }
 
-const isEmpty = (cell: Cell) => cell.kind === 'missing' || cell.kind === 'null';
+export const isEmpty = (cell: Cell) => cell.kind === 'missing' || cell.kind === 'null';
 
 export function isNumericColumn(cells: Cell[]): boolean {
   return cells.every((cell) => isEmpty(cell) || cell.kind === 'number');

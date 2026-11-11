@@ -333,13 +333,23 @@ export function renderHtml(script: string): string {
 }
 
 const STYLE = `
-body { font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--vscode-foreground); }
-.bar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+html, body, #root { height: 100%; }
+body { margin: 0; padding: 0 8px 8px; box-sizing: border-box; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--vscode-foreground); background: var(--vscode-editor-background); user-select: none; }
+#root { display: flex; flex-direction: column; }
+.bar { display: flex; gap: 8px; align-items: center; padding: 8px 0; }
 .summary { flex: 1; color: var(--vscode-descriptionForeground); }
 button { color: var(--vscode-button-foreground); background: var(--vscode-button-background); border: none; padding: 2px 8px; cursor: pointer; }
 button:hover { background: var(--vscode-button-hoverBackground); }
-pre { font-family: var(--vscode-editor-font-family); white-space: pre-wrap; margin: 0 0 8px; color: var(--vscode-descriptionForeground); }
-table { border-collapse: collapse; font-family: var(--vscode-editor-font-family); }
-th, td { border: 1px solid var(--vscode-panel-border); padding: 2px 6px; text-align: left; vertical-align: top; white-space: pre; }
-th { position: sticky; top: 0; background: var(--vscode-editor-background); }
+.grid { flex: 1; min-height: 0; overflow: auto; }
+.grid:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+.measure { position: absolute; visibility: hidden; white-space: pre; font-family: var(--vscode-editor-font-family); }
+table { table-layout: fixed; border-collapse: separate; border-spacing: 0; font-family: var(--vscode-editor-font-family); }
+th, td { padding: 2px 6px; border-right: 1px solid var(--vscode-panel-border); border-bottom: 1px solid var(--vscode-panel-border); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+th { position: sticky; top: 0; z-index: 2; background: var(--vscode-editor-background); cursor: pointer; }
+.sort { margin-left: 4px; }
+tbody tr:nth-child(even) { background: var(--vscode-keybindingTable-rowsBackground, var(--vscode-list-hoverBackground)); }
+.rownum { position: sticky; left: 0; z-index: 1; background: var(--vscode-editor-background); color: var(--vscode-editorLineNumber-foreground); text-align: right; }
+th.rownum { z-index: 3; cursor: default; }
+td.null, td.json { color: var(--vscode-descriptionForeground); }
+td.number { text-align: right; }
 `;
