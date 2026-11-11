@@ -314,7 +314,7 @@ function rebuildTable(): void {
     );
     th.append(head, element('span', undefined, 'resize'));
     th.addEventListener('click', (event) => {
-      if (suppressClick) return;
+      if (suppressClick || (event.target as Element).closest('.resize')) return;
       column.getToggleSortingHandler()?.(event);
       rebuildTable();
     });
@@ -373,10 +373,13 @@ function anchorOr(point: Point): Point {
     : point;
 }
 
-/** `extend` selects the range from the anchor; `add` keeps the old selection. */
+/**
+ * `extend` selects the range from the anchor, else from the focused cell; `add` keeps the old
+ * selection.
+ */
 function select(point: Point, extend: boolean, add: boolean, wholeRows: boolean): void {
   if (!grid) return;
-  const from = extend ? anchorOr(point) : point;
+  const from = extend ? anchorOr(grid.focus ?? point) : point;
   const rows = between(grid.viewRows, from.row, point.row);
   const columns = wholeRows ? [] : between(grid.viewColumns, from.column, point.column);
   if (add) {
@@ -385,7 +388,7 @@ function select(point: Point, extend: boolean, add: boolean, wholeRows: boolean)
     grid.selection.wholeRows ||= wholeRows;
   } else grid.selection = {rows: new Set(rows), columns: new Set(columns), wholeRows};
   grid.focus = point;
-  if (!extend) grid.anchor = point;
+  grid.anchor = from;
   paint();
 }
 

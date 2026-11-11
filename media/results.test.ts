@@ -263,6 +263,16 @@ describe('results webview', () => {
     expect(columnTexts(2)).toEqual(['10', '20', '30']);
   });
 
+  // A press on the resize edge with no move ends in a click on the edge; it must not sort.
+  it('does not sort on a click on the resize edge without a move', () => {
+    render(people('edge-click'));
+    const edge = header('amount')?.querySelector('.resize') as Element;
+    mouse(edge, 'mousedown', {clientX: 100, buttons: 1});
+    mouse(edge, 'mouseup', {clientX: 100});
+    mouse(edge, 'click');
+    expect(columnTexts(2)).toEqual(['30', '10', '20']);
+  });
+
   // TanStack's default global filter skips a column whose first cell is missing, so it would hide
   // every row.
   it('filters rows on a column whose first cell is missing', () => {
@@ -351,6 +361,22 @@ describe('results webview', () => {
       rows: [0, 1, 2],
       columns: [0, 1, 2]
     });
+
+    // With no anchor yet, the first Shift+arrow must set one, or each next one selects one cell.
+    render(people('select-no-anchor'));
+    for (let press = 0; press < 3; press++)
+      keydown(scrollBox(), {key: 'ArrowDown', shiftKey: true});
+    scrollBox().focus();
+    copy();
+    expect(posted.at(-1)).toMatchObject({type: 'copySelection', rows: [0, 1, 2], columns: [0]});
+
+    // A hidden anchor gives way to the focused cell, not to the cell the arrow moves to.
+    mouse(cell(0, 1), 'click');
+    choose(header('note') as Element, 'Hide Column');
+    keydown(scrollBox(), {key: 'ArrowDown', shiftKey: true});
+    scrollBox().focus();
+    copy();
+    expect(posted.at(-1)).toMatchObject({type: 'copySelection', rows: [0, 1], columns: [2]});
     // VS Code's own webview menu would show over the row numbers.
     expect(mouse(rowNumber(0), 'contextmenu')).toBe(false);
   });
