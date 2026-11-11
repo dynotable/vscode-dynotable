@@ -153,7 +153,7 @@ function csvField(text: string, delimiter: string, guard: boolean): string {
     : guarded;
 }
 
-export function valueText(row: Record<string, unknown>, column: string): string {
+function valueText(row: Record<string, unknown>, column: string): string {
   return cellKind(row, column).text;
 }
 
@@ -202,7 +202,7 @@ function markdownCell(text: string): string {
 
 const markdownLine = (texts: string[]) => `| ${texts.map(markdownCell).join(' | ')} |`;
 
-export function markdownTable(result: RunResult, rows: number[], columns: number[]): string {
+function markdownTable(result: RunResult, rows: number[], columns: number[]): string {
   const names = columns.map((column) => at(result.columns, column));
   return [
     markdownLine(names),
@@ -237,6 +237,11 @@ export function formatText(
   }
 }
 
+/** Every row and column in query order, with the header. */
+export function allText(result: RunResult, format: CopyFormat): string {
+  return formatText(result, [...result.rows.keys()], [...result.columns.keys()], format, true);
+}
+
 export function toJson(result: RunResult): string {
   return JSON.stringify(result.rows, null, 2);
 }
@@ -269,15 +274,11 @@ export function copyText(
   if (message.resultId !== resultId) return undefined;
   const inRows = (row: number) => row < result.rows.length;
   const inColumns = (column: number) => column < result.columns.length;
-  const allRows = [...result.rows.keys()];
   switch (message.type) {
     case 'copy':
       return {
-        text:
-          message.format === 'csv'
-            ? formatText(result, allRows, [...result.columns.keys()], 'csv', true)
-            : toJson(result),
-        status: `Copied ${plural(allRows.length, 'row', 'rows')} as ${FORMAT_NAMES[message.format]}.`
+        text: message.format === 'csv' ? allText(result, 'csv') : toJson(result),
+        status: `Copied ${plural(result.rows.length, 'row', 'rows')} as ${FORMAT_NAMES[message.format]}.`
       };
     case 'copySelection': {
       const {rows, columns, format, header} = message;

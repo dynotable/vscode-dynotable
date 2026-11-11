@@ -110,6 +110,11 @@ describe('totals', () => {
     expect(totals(cellsOf(1e-7, 0.1))).toContain(' · Sum 0.1000001 · ');
   });
 
+  // A sum that dropped the sign of a negative term would give 0.8.
+  it('sums a negative number with its sign', () => {
+    expect(totals(cellsOf(-0.5, 0.3))).toBe('Count 2 · Sum -0.2 · Avg -0.1 · Min -0.5 · Max 0.3');
+  });
+
   it('divides the average without rounding', () => {
     expect(totals(cellsOf(1, 2))).toBe('Count 2 · Sum 3 · Avg 1.5 · Min 1 · Max 2');
   });

@@ -13,6 +13,7 @@ import {
   saveDialogs,
   show as showFile,
   sleep,
+  statusMessages,
   toastAnswers,
   toasts,
   waitFor,
@@ -112,6 +113,7 @@ describe('run', () => {
     quickPicks.shown.length = 0;
     saveDialogs.answer = undefined;
     saveDialogs.defaultUri = undefined;
+    statusMessages.length = 0;
   });
 
   it('lens Run: reaches the panel with the statement range of its argument', async () => {
@@ -311,6 +313,7 @@ describe('run', () => {
     };
     await (await panel()).receive({...selection, resultId: first});
     assert.equal(await vscode.env.clipboard.readText(), KNOWN);
+    assert.deepEqual(statusMessages, ['The results changed. Copy again.']);
     await (await panel()).receive({...selection, resultId: current});
     assert.notEqual(await vscode.env.clipboard.readText(), KNOWN);
   });
@@ -353,6 +356,28 @@ describe('run', () => {
 ]`
     );
     assert.deepEqual(toasts, []);
+    assert.deepEqual(statusMessages, ['Saved 3 rows to rows.json.']);
+  });
+
+  // Each format has its own extension; a wrong entry would save a table under another name.
+  it('export: Markdown saves a table with the .md extension', async () => {
+    await show('export-md.dynotable.sql');
+    await run();
+    const uri = exportUri('rows.md');
+    quickPicks.answer = 'Markdown';
+    saveDialogs.answer = uri;
+    await exportResult();
+    assert.equal(saveDialogs.defaultUri?.path.endsWith('/dynotable-results.md'), true);
+    assert.equal(
+      readFileSync(uri.fsPath, 'utf8'),
+      [
+        '| o.orderId | o.status | c.country |',
+        '| --- | --- | --- |',
+        '| ORD2024056001 | PENDING | Tajikistan |',
+        '| ORD2024098001 | PENDING | China |',
+        '| ORD2024085001 | COMPLETED | Mongolia |'
+      ].join('\n')
+    );
   });
 
   // A spreadsheet opens the saved file and would run the formula.
@@ -387,6 +412,7 @@ describe('run', () => {
     saveDialogs.answer = uri;
     await (await panel()).receive({type: 'export', resultId: first});
     assert.deepEqual(quickPicks.shown, []);
+    assert.deepEqual(statusMessages, ['The results changed. Export again.']);
     assert.equal(existsSync(uri.fsPath), false);
   });
 

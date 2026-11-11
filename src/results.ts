@@ -4,8 +4,8 @@ import {posix} from 'node:path';
 import * as vscode from 'vscode';
 import {is, runResultSchema, type RunResult} from './protocol';
 import {
+  allText,
   copyText,
-  formatText,
   parseMessage,
   renderHtml,
   resultView,
@@ -105,13 +105,15 @@ export class ResultsPanel implements vscode.Disposable {
       case 'copyValue':
       case 'copyColumn':
       case 'copyColumnName': {
-        const copy = this.result && copyText(this.result.value, this.result.id, message);
-        if (copy) {
-          await vscode.env.clipboard.writeText(copy.text);
-          vscode.window.setStatusBarMessage(copy.status, COPIED_MESSAGE_MS);
-        } else if (message.resultId !== this.result?.id) {
+        const result = this.result;
+        if (result?.id !== message.resultId) {
           vscode.window.setStatusBarMessage('The results changed. Copy again.', COPIED_MESSAGE_MS);
+          return;
         }
+        const copy = copyText(result.value, result.id, message);
+        if (!copy) return;
+        await vscode.env.clipboard.writeText(copy.text);
+        vscode.window.setStatusBarMessage(copy.status, COPIED_MESSAGE_MS);
         return;
       }
       case 'export':
@@ -135,14 +137,7 @@ export class ResultsPanel implements vscode.Disposable {
       defaultUri: vscode.Uri.joinPath(folder, `dynotable-results.${picked.extension}`)
     });
     if (!uri) return;
-    const {rows, columns} = result.value;
-    const text = formatText(
-      result.value,
-      [...rows.keys()],
-      [...columns.keys()],
-      picked.format,
-      true
-    );
+    const text = allText(result.value, picked.format);
     try {
       await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(text));
     } catch (error) {
@@ -151,7 +146,7 @@ export class ResultsPanel implements vscode.Disposable {
       return;
     }
     vscode.window.setStatusBarMessage(
-      savedStatus(rows.length, posix.basename(uri.path)),
+      savedStatus(result.value.rows.length, posix.basename(uri.path)),
       COPIED_MESSAGE_MS
     );
   }
@@ -177,7 +172,12 @@ export class ResultsPanel implements vscode.Disposable {
       {viewColumn: vscode.ViewColumn.Beside, preserveFocus: true},
       {enableScripts: true, localResourceRoots: []}
     );
-    panel.webview.onDidReceiveMessage((message: unknown) => this.receive(message));
+    panel.webview.onDidReceiveMessage((message: unknown) => {
+      this.receive(message).catch((error: unknown) => {
+        const reason = error instanceof Error ? error.message : String(error);
+        void vscode.window.showErrorMessage(`The results panel action failed: ${reason}`);
+      });
+    });
     panel.onDidDispose(() => {
       this.panel = undefined;
       this.run?.source.cancel();

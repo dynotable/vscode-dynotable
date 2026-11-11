@@ -182,7 +182,6 @@ describe('copy formats', () => {
         ']'
       ].join('\n')
     );
-    expect(() => JSON.parse(text) as unknown).not.toThrow();
     expect(jsonText(hostile, [], [1])).toBe('[]');
   });
 
@@ -259,8 +258,9 @@ describe('panel messages', () => {
     });
   });
 
-  // `at` throws on a bad index, and a copy of nothing is not a copy.
-  it('rejects a fractional or negative index, an empty row list and a missing result id', () => {
+  // `at` throws on a bad index, and a copy of nothing is not a copy. The toolbar copy knows only
+  // CSV and JSON: `copyText` would give JSON for any other format.
+  it('rejects a bad index, an empty row list, a missing result id and a bad field type', () => {
     const selection = {
       type: 'copySelection',
       resultId: 'r1',
@@ -273,6 +273,10 @@ describe('panel messages', () => {
     expect(parseMessage({...selection, columns: [-1]})).toBeUndefined();
     expect(parseMessage({...selection, rows: []})).toBeUndefined();
     expect(parseMessage({type: 'copy', format: 'csv'})).toBeUndefined();
+    expect(parseMessage({type: 'copy', resultId: 'r1', format: 'tsv'})).toBeUndefined();
+    expect(
+      parseMessage({type: 'copyValue', resultId: 'r1', row: 0, column: 0, pretty: 'yes'})
+    ).toBeUndefined();
   });
 });
 
@@ -323,6 +327,16 @@ describe('copyText', () => {
         header: true
       })?.status
     ).toBe('Copied 1 row as CSV.');
+    expect(
+      copyText(orders, 'r1', {
+        type: 'copySelection',
+        resultId: 'r1',
+        format: 'markdown',
+        rows: [0, 1],
+        columns: [0],
+        header: true
+      })?.status
+    ).toBe('Copied 2 rows as Markdown.');
     expect(
       copyText(orders, 'r1', {type: 'copyColumn', resultId: 'r1', column: 1, rows: [1, 0]})
     ).toEqual({text: 'b\na', status: 'Copied 2 values of \\$(alert).'});

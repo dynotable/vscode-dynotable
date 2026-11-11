@@ -52,6 +52,9 @@ export const saveDialogs: {answer: vscode.Uri | undefined; defaultUri: vscode.Ur
   defaultUri: undefined
 };
 
+/** Every `window.setStatusBarMessage` text, in call order. */
+export const statusMessages: string[] = [];
+
 /** Every string written to an output channel created while the stub is in place. */
 export const channelText: string[] = [];
 
@@ -76,6 +79,10 @@ export function stubWindow(): void {
   window.showSaveDialog = (options?: vscode.SaveDialogOptions) => {
     saveDialogs.defaultUri = options?.defaultUri;
     return Promise.resolve(saveDialogs.answer);
+  };
+  window.setStatusBarMessage = (text: string) => {
+    statusMessages.push(text);
+    return new vscode.Disposable(() => {});
   };
   const create = vscode.window.createOutputChannel.bind(vscode.window) as (
     ...args: unknown[]
