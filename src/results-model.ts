@@ -328,7 +328,7 @@ body { margin: 0; padding: 0 8px 8px; box-sizing: border-box; font-family: var(-
 #root { display: flex; flex-direction: column; }
 .bar { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; padding: 8px 0; }
 .bar > * { flex: none; white-space: nowrap; }
-.bar > .summary { flex: 1 1 200px; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--vscode-descriptionForeground); }
+.bar > .summary { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--vscode-descriptionForeground); }
 button { font: inherit; padding: 2px 8px; line-height: 18px; border: 1px solid var(--vscode-button-border, transparent); border-radius: 2px; cursor: pointer; color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground); }
 button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 button.primary { color: var(--vscode-button-foreground); background: var(--vscode-button-background); }
