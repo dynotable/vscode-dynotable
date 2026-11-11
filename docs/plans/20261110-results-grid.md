@@ -270,7 +270,7 @@ again.` in the status bar.
   the mouseup, so a resize or a reorder never sorts and the next real click still does. A drag also
   ends on a mousemove with `buttons === 0` and on window `blur`. A drop across the pinned boundary is
   refused (pin or unpin with the menu); a drop inside the pinned group reorders
-  `columnPinning.left`.
+  `columnPinning.start`.
 - **Row numbers**: the position in the view, 1…N after sort and filter.
 - **Selection (cells and ranges)**: a click selects one cell and focuses it. Shift-click and
   Shift+arrows extend a rectangular range from the anchor. The add modifier (Cmd on macOS, Ctrl
@@ -320,7 +320,7 @@ again.` in the status bar.
   reference: `Count 46 · Sum 11519.75 · Avg 250.42934782608697 · Min 15.97 · Max 484.6`.
 - **Pin Column** (user decision, 2026-11-10, both plugins): the header menu's **Pin Column** pins the
   right-clicked column, wherever it is; several columns can be pinned. Pinned columns sit next to the
-  row numbers (TanStack column pinning, left; `position: sticky` with cumulative `left` offsets) and
+  row numbers (TanStack column pinning, `start`; `position: sticky` with cumulative `left` offsets) and
   come first in view order, so they also copy first. A pinned header's menu shows **Unpin Column**. A
   new result unpins all. Pinned columns keep the order they were pinned in. **Unpin Column** puts the
   column back at the start of the unpinned columns (JetBrains confirmed both).
@@ -347,7 +347,63 @@ again.` in the status bar.
 
 ### TanStack v9 notes
 
-(Task 1 writes the confirmed API calls here.)
+Confirmed on `@tanstack/table-core` 9.3.1 (its published `.d.ts`, `.js` and `skills/`), with node
+scripts outside the repository.
+
+- **Setup (vanilla)**: `constructTable({features, columns, data, …})` with
+  `features = tableFeatures({coreReactivityFeature: storeReactivityBindings(), columnFilteringFeature,
+  globalFilteringFeature, rowSortingFeature, columnOrderingFeature, columnVisibilityFeature,
+  columnPinningFeature, columnSizingFeature, filteredRowModel: createFilteredRowModel(),
+  sortedRowModel: createSortedRowModel()})`. `storeReactivityBindings` comes from
+  `@tanstack/table-core/store-reactivity-bindings`. Read state with `table.atoms.<slice>.get()`; write
+  it with the feature setters (`table.setSorting`, `setGlobalFilter`, `setColumnFilters`,
+  `setColumnOrder`, `setColumnVisibility`, `setColumnPinning`, `setColumnSizing`, `column.pin`,
+  `column.toggleVisibility`, `column.toggleSorting`). Rows: `table.getRowModel().rows`; `row.index`
+  is the index into `data`. The row models are pull-based memos: they recompute on the next read when
+  a dependency changes. One table per `resultId`: a new result constructs a new table, so all
+  TanStack state resets.
+- **Columns**: `{id: String(i), accessorFn: (row) => …}` works; an `accessorFn` without an `id`
+  throws in development builds.
+- **Sort**: `sortUndefined: 'last'` returns before the direction is applied, so `undefined` stays last
+  in descending order too. Two `undefined` values fall through to `rowA.index - rowB.index`, so their
+  order is stable. A custom `sortFn(rowA, rowB, columnId)` returns the ascending order; TanStack
+  reverses it for `desc`. With `sortDescFirst: false`, `getToggleSortingHandler()` cycles ascending,
+  descending, none. With `enableMultiSort: false`, a Shift-click on another column replaces the sort.
+- **Global filter**: `globalFilterFn(row, columnId, filterValue)` runs per column until one returns
+  true. `getColumnCanGlobalFilter(column)` replaces the default, which reads the first row with a
+  non-null value and accepts only a string or a number. The filter value can be any value; `undefined`,
+  `null` and `''` mean no filter.
+- **Visibility does not re-filter** (deviation from the plan's assumption): the filtered model's memo
+  depends only on the pre-filtered rows, `columnFilters` and `globalFilter`. So the global filter
+  value is a fresh object `{query}`, and every visibility change calls
+  `table.setGlobalFilter((old) => old && {...old})` to re-run it.
+- **Column filter**: a column `filterFn(row, columnId, filterValue)` given as a function needs no
+  registry entry. A filter on a hidden column still applies. `getPreFilteredRowModel().rows.length`
+  and `getFilteredRowModel().rows.length` give the `N of M` counts.
+- **Pinning** (deviation: v9 has no `left`): the state is `columnPinning: {start: string[], end:
+  string[]}`, and `column.pin('start' | 'end' | false)`. Start-pinned columns come first, in
+  `columnPinning.start` order, whatever `columnOrder` says. Drag inside the pinned group: write a new
+  `start` array. `column.pin(false)` puts the column back at its `columnOrder` place, so **Unpin
+  Column** also moves the id to the start of the unpinned ids in `columnOrder`.
+- **View order**: `table.getVisibleLeafColumns()` and `column.getIndex()` do **not** apply pinning.
+  Use `table.getHeaderGroups()[0].headers` (or `row.getVisibleCells()`), or
+  `getStartVisibleLeafColumns()` then `getCenterVisibleLeafColumns()`.
+- **Order**: `setColumnOrder(ids)` orders the unpinned columns; an empty array means definition
+  order.
+- **Sizing**: `setColumnSizing({[id]: px})`; `column.getSize()`; `table.getTotalSize()` sums the
+  visible columns; `column.getStart('start')` gives a pinned column's cumulative offset. The default
+  column def is `{size: 150, minSize: 20, maxSize: Number.MAX_SAFE_INTEGER}`, so our 60–400 px clamp
+  is our own code.
+- **`cellSelectionFeature`: not used.** Its state is an ordered log of rectangles anchored to corner
+  ids. Two add-clicked cells in different rows and columns select 2 cells, not the 2×2 cross; a range
+  over columns `0..1` covers 3 cells after a reorder puts a column between them. Both break the rows ×
+  columns model, so selection stays our own state.
+- **Webview runtime (Chromium 122)**: table-core and `@tanstack/store` have no `eval` and no `new
+  Function`. Their newest built-ins are `String.prototype.replaceAll` (Chromium 85),
+  `queueMicrotask` (71) and `Array.prototype.flatMap` (69). They read `process.env.NODE_ENV`;
+  esbuild's browser platform replaces it in both builds, and the bundle has no `process` reference.
+  A probe bundle with the features above runs in a context with no `process`. Its size: 54 KB
+  minified, 15 KB gzipped.
 
 ## What Goes Where
 
@@ -363,22 +419,22 @@ again.` in the status bar.
 - Modify: `package.json`, `pnpm-lock.yaml`
 - Modify: `docs/plans/20261110-results-grid.md` ("TanStack v9 notes")
 
-- [ ] read the TanStack Table v9 docs and the published `.d.ts` and `.js` of table-core:
+- [x] read the TanStack Table v9 docs and the published `.d.ts` and `.js` of table-core:
       `tableFeatures`, `constructTable`, the `*Feature` exports, `createSortedRowModel`,
       `createFilteredRowModel`, how a vanilla (no framework) table reads and sets state
-- [ ] confirm: how left-pinned columns are ordered (`columnPinning.left` vs `columnOrder`); an explicit
+- [x] confirm: how left-pinned columns are ordered (`columnPinning.left` vs `columnOrder`); an explicit
       column `id` with `accessorFn`; `sortUndefined: 'last'` in descending order
       and a stable order of `undefined` rows; `sortDescFirst`, `enableMultiSort`; a custom `sortFn`; a
       per-cell `globalFilterFn` with `getColumnCanGlobalFilter`; that a visibility change re-filters; a
       column `filterFn`; column order, visibility, pinning (left) and sizing
-- [ ] check `cellSelectionFeature`: use it if it holds rows × columns with an anchor, else record why
+- [x] check `cellSelectionFeature`: use it if it holds rows × columns with an anchor, else record why
       selection stays our own state
-- [ ] check the bundle's built-ins against Chromium 122 (the VS Code 1.91 webview), and that table-core
+- [x] check the bundle's built-ins against Chromium 122 (the VS Code 1.91 webview), and that table-core
       and `@tanstack/store` use no `eval` or `new Function` (the CSP has no `unsafe-eval`); write the
       results
-- [ ] add `@tanstack/table-core` at the exact version `9.3.1` to `dependencies`
-- [ ] write the confirmed calls under "TanStack v9 notes" and run `pnpm format` on the plan
-- [ ] run `pnpm typecheck`, `pnpm build` and `pnpm test` - must pass before task 2
+- [x] add `@tanstack/table-core` at the exact version `9.3.1` to `dependencies`
+- [x] write the confirmed calls under "TanStack v9 notes" and run `pnpm format` on the plan
+- [x] run `pnpm typecheck`, `pnpm build` and `pnpm test` - must pass before task 2
 
 ### Task 2: Add the cell, sort, filter, totals and width rules
 
@@ -563,7 +619,7 @@ again.` in the status bar.
 - [ ] the selection totals line, from `totals`
 - [ ] header edge drag resizes (table width follows); header drag reorders; mouse events, no HTML5 drag
       and drop; a drag suppresses the next click (flag cleared next tick); a drag ends on `buttons === 0`
-      and `blur`; a drop across the pinned boundary is refused, inside it reorders `columnPinning.left`
+      and `blur`; a drop across the pinned boundary is refused, inside it reorders `columnPinning.start`
 - [ ] test `selectionCells`: rows and columns added in an order other than view order come out in view
       order; two add-clicked cells in different rows and columns give the 2×2 cross; `wholeRows` gives all
       visible columns; a selection whose columns are all hidden gives no cells; a selected row that the

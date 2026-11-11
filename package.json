@@ -247,6 +247,7 @@
     "gate": "pnpm typecheck && pnpm lint && pnpm test && pnpm test:integration && pnpm cli:build && pnpm cli:binary && pnpm package"
   },
   "dependencies": {
+    "@tanstack/table-core": "9.3.1",
     "semver": "^7.8.5",
     "vscode-languageclient": "11.0.0"
   },
