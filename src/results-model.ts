@@ -368,8 +368,9 @@ label { display: flex; gap: 4px; align-items: center; }
 .menu .item:hover, .menu .item.active { color: var(--vscode-menu-selectionForeground); background: var(--vscode-menu-selectionBackground); }
 .menu .item[aria-disabled="true"] { opacity: 0.5; background: none; }
 .menu .separator { margin: 4px 0; border-top: 1px solid var(--vscode-menu-separatorBackground); }
-.popup { display: flex; flex-direction: column; gap: 4px; padding: 6px; }
-.popup .values { max-height: 240px; overflow: auto; }
+.popup { display: flex; flex-direction: column; gap: 4px; padding: 6px; max-width: min(360px, calc(100vw - 16px)); max-height: calc(100vh - 16px); }
+.popup .values { max-height: 240px; overflow: hidden auto; }
+.popup .values span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .popup label[hidden] { display: none; }
 .actions { display: flex; gap: 8px; justify-content: flex-end; }
 dialog { max-width: 80vw; max-height: 80vh; color: var(--vscode-foreground); background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border)); }

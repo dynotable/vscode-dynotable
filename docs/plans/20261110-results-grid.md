@@ -158,13 +158,13 @@ integers. `rows` and `columns` must be non-empty.
 - `copyColumnName {resultId, column}`.
 - `export {resultId}`: the host asks for the format.
 
-The pure function `copyText(result, resultId, message)` returns `{text, status}` or `undefined`.
-`undefined` when the `resultId` is not the current one, or a row index (`row` or in `rows`) or a column
-index (`column` or in `columns`) is out of range. `parseMessage` already rejects negative and fractional
-indices and an empty `rows` / `columns` list in `copySelection` and `copyColumn`. The toolbar `copy` and
-`export` take all rows, so a result with columns and no rows still copies its header. On
-`undefined` the host copies nothing; for a stale `resultId` it shows `The results changed. Copy
-again.` in the status bar.
+`ResultsPanel` compares the message `resultId` with the current one first. For a stale `resultId` it
+copies nothing and shows `The results changed. Copy again.` in the status bar. Then the pure function
+`copyText(result, message)` returns `{text, status}`. It throws a `RangeError` when a row index (`row` or
+in `rows`) or a column index (`column` or in `columns`) is out of range, so a copy never holds part of
+the result. `parseMessage` already rejects negative and fractional indices and an empty `rows` /
+`columns` list in `copySelection` and `copyColumn`. The toolbar `copy` and `export` take all rows, so a
+result with columns and no rows still copies its header.
 
 ### Copy formats (host, `src/results-model.ts`)
 
@@ -518,8 +518,8 @@ scripts outside the repository.
       `resultView(result, resultId)`
 - [x] `parseMessage`: accept `copy`, `copySelection`, `copyValue`, `copyColumn`, `copyColumnName` and
       `export` with `resultId`, non-negative integer indices and non-empty lists; reject any other shape
-- [x] add `copyText(result, resultId, message)` returning `{text, status}` or `undefined`, with the
-      status texts, the singular forms and the `$(` escape
+- [x] add `copyText(result, message)` returning `{text, status}`, with the status texts, the singular
+      forms and the `$(` escape; it throws a `RangeError` for an index out of range
 - [x] `ResultsPanel`: store `run.id` as the current `resultId` together with `this.result`, on success
       only; send every copy message through `copyText`; show `The results changed. Copy again.` for a
       stale id; add a public `runResult` getter, and `runResult()` to `TestApi.panel` in
@@ -530,10 +530,9 @@ scripts outside the repository.
 - [x] test `parseMessage`: one accept case per new type (`copySelection`, `copyValue` with `pretty`,
       `copyColumn`, `copyColumnName`, `export`) gives the exact parsed object; a fractional index, `-1`, an
       empty `rows` in `copySelection` and a message with no `resultId` are rejected
-- [x] test `copyText`: an old `resultId`, `copyValue` with `row: rows.length`, `copyColumnName` with
+- [x] test `copyText`: `copyValue` with `row: rows.length`, `copyColumnName` with
       `column: columns.length`, `copySelection` with an unknown column index, and `copyColumn` with
-      `rows: [rows.length]` each return
-      `undefined`; toolbar `copy` on a result with columns and no rows returns the header; `copySelection` status counts the selection (`Copied 1 row as
+      `rows: [rows.length]` each throw a `RangeError` (the stale `resultId` is an integration test); toolbar `copy` on a result with columns and no rows returns the header; `copySelection` status counts the selection (`Copied 1 row as
       CSV.` for one row); `copyColumn` on a column named `$(alert)` gives `Copied 2 values of
       \$(alert).`; `copyValue` on a json cell gives the literal indented text with `pretty: true` and the compact
       text with `pretty: false`

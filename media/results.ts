@@ -941,7 +941,7 @@ function checkbox(
   box.type = 'checkbox';
   box.checked = checked;
   const label = element('label');
-  label.append(box, text);
+  label.append(box, element('span', text));
   return {box, label};
 }
 
@@ -966,6 +966,8 @@ function openFilter(id: string, x: number, y: number): void {
   if (empty) entries.push({...checkbox('(empty)', current?.empty ?? true), text: '(empty)'});
   for (const value of values)
     entries.push({...checkbox(value, current?.values.has(value) ?? true), text: value, value});
+  // A long value is cut with an ellipsis; the tooltip shows all of it.
+  for (const entry of entries) entry.label.title = entry.text;
 
   const shown = () => entries.filter((entry) => !entry.label.hidden);
   const all = checkbox('Select All', false);
