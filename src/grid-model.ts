@@ -139,8 +139,11 @@ export function selectionCells(
   return rows.length > 0 && columns.length > 0 ? {rows, columns} : {rows: [], columns: []};
 }
 
-/** The header also holds the sort mark and the filter icon. */
-const HEADER_EXTRA = 3;
+/**
+ * The header also holds the sort mark and the filter icon, 3.5ch in the header CSS. The rest is for
+ * a bold name or a mark glyph wider than 1ch.
+ */
+const HEADER_EXTRA = 4;
 const PADDING = 2;
 
 /** A column width in characters. */

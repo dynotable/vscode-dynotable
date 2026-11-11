@@ -103,6 +103,8 @@ let shownResultId: string | undefined;
 let filterRows = false;
 let findInput: HTMLInputElement | undefined;
 let findTimer: ReturnType<typeof setTimeout> | undefined;
+/** Enables Previous and Next only while the find field holds a query. */
+let syncSteps = () => {};
 let rowsNote: HTMLElement | undefined;
 let totalsLine: HTMLElement | undefined;
 let drag: Drag | undefined;
@@ -149,6 +151,40 @@ function action(text: string, run: () => void): HTMLButtonElement {
 
 const button = (text: string, message: PanelMessage) =>
   action(text, () => host.postMessage(message));
+
+/** For the main action of a popup or dialog only. */
+function primary(node: HTMLButtonElement): HTMLButtonElement {
+  node.classList.add('primary');
+  return node;
+}
+
+const SVG = 'http://www.w3.org/2000/svg';
+
+function arrowIcon(direction: 'up' | 'down'): SVGSVGElement {
+  const svg = document.createElementNS(SVG, 'svg');
+  svg.setAttribute('viewBox', '0 0 16 16');
+  svg.setAttribute('width', '16');
+  svg.setAttribute('height', '16');
+  svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS(SVG, 'path');
+  path.setAttribute(
+    'd',
+    direction === 'up' ? 'M8.5 13.5V3M4 7.5 8.5 3 13 7.5' : 'M8.5 2.5V13M4 8.5 8.5 13 13 8.5'
+  );
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke', 'currentColor');
+  svg.append(path);
+  return svg;
+}
+
+function iconAction(label: string, icon: SVGSVGElement, run: () => void): HTMLButtonElement {
+  const node = element('button', undefined, 'icon');
+  node.title = label;
+  node.setAttribute('aria-label', label);
+  node.append(icon);
+  node.addEventListener('click', run);
+  return node;
+}
 
 let measuredCharWidth: number | undefined;
 
@@ -461,6 +497,7 @@ function applyQuery(query: string): void {
 
 function clearQuery(): void {
   if (findInput) findInput.value = '';
+  syncSteps();
   applyQuery('');
 }
 
@@ -489,10 +526,17 @@ function step(direction: 1 | -1): void {
 }
 
 function findControls(query: string): HTMLElement[] {
+  const previous = iconAction('Previous Match (Shift+Enter)', arrowIcon('up'), () => step(-1));
+  const next = iconAction('Next Match (Enter)', arrowIcon('down'), () => step(1));
   const input = element('input', undefined, 'find');
   input.placeholder = 'Find';
   input.value = query;
+  syncSteps = () => {
+    previous.disabled = next.disabled = input.value === '';
+  };
+  syncSteps();
   input.addEventListener('input', () => {
+    syncSteps();
     clearTimeout(findTimer);
     findTimer = setTimeout(() => applyQuery(input.value), FIND_DELAY);
   });
@@ -513,13 +557,7 @@ function findControls(query: string): HTMLElement[] {
 
   rowsNote = element('span', undefined, 'note');
   rowsNote.hidden = true;
-  return [
-    input,
-    action('Previous', () => step(-1)),
-    action('Next', () => step(1)),
-    label,
-    rowsNote
-  ];
+  return [input, previous, next, label, rowsNote];
 }
 
 /** A width change keeps the table; it updates the widths, the table width and the sticky offsets. */
@@ -738,7 +776,9 @@ function openViewer(point: Point): void {
       );
   else body.textContent = pretty;
   openDialog(`${columnName(column)} · row ${rowNumber(row)}`, body, [
-    button('Copy', {type: 'copyValue', resultId: grid.view.resultId, row, column, pretty: true})
+    primary(
+      button('Copy', {type: 'copyValue', resultId: grid.view.resultId, row, column, pretty: true})
+    )
   ]);
 }
 
@@ -1007,7 +1047,7 @@ function openFilter(id: string, x: number, y: number): void {
   });
   const actions = element('div', undefined, 'actions');
   actions.append(
-    apply,
+    primary(apply),
     action('Clear', () => setColumnFilter(id, undefined))
   );
 
@@ -1083,6 +1123,7 @@ function render(view: View): void {
   root.replaceChildren(bar);
   scrollBox = undefined;
   findInput = undefined;
+  syncSteps = () => {};
   rowsNote = undefined;
   totalsLine = undefined;
   drag = undefined;

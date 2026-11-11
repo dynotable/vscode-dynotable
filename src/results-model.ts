@@ -328,8 +328,17 @@ body { margin: 0; padding: 0 8px 8px; box-sizing: border-box; font-family: var(-
 #root { display: flex; flex-direction: column; }
 .bar { display: flex; gap: 8px; align-items: center; padding: 8px 0; }
 .summary { flex: 1; color: var(--vscode-descriptionForeground); }
-button { color: var(--vscode-button-foreground); background: var(--vscode-button-background); border: none; padding: 2px 8px; cursor: pointer; }
-button:hover { background: var(--vscode-button-hoverBackground); }
+button { font: inherit; padding: 2px 8px; line-height: 18px; border: 1px solid var(--vscode-button-border, transparent); border-radius: 2px; cursor: pointer; color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground); }
+button:hover { background: var(--vscode-button-secondaryHoverBackground); }
+button.primary { color: var(--vscode-button-foreground); background: var(--vscode-button-background); }
+button.primary:hover { background: var(--vscode-button-hoverBackground); }
+button:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }
+.bar button { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; height: 22px; padding: 2px 6px; border: none; border-radius: 5px; color: var(--vscode-foreground); background: transparent; }
+.bar button.icon { width: 22px; padding: 3px; }
+.bar button:hover:enabled { background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground)); }
+.bar button:active:enabled { background: var(--vscode-toolbar-activeBackground, var(--vscode-toolbar-hoverBackground)); }
+.bar button:disabled { opacity: 0.4; cursor: default; }
+.bar button:focus-visible { outline-offset: -1px; }
 .grid { flex: 1; min-height: 0; overflow: auto; }
 .grid:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
 .measure { position: absolute; visibility: hidden; white-space: pre; font-family: var(--vscode-editor-font-family); }
@@ -338,8 +347,8 @@ th, td { padding: 2px 6px; border-right: 1px solid var(--vscode-panel-border); b
 th { position: sticky; top: 0; z-index: 2; background: var(--vscode-editor-background); cursor: pointer; }
 .head { display: flex; align-items: center; }
 .head .name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.sort, .filter { flex: none; }
-.sort { margin-left: 4px; }
+/* The header reserves 3.5ch for these two: see HEADER_EXTRA in grid-model.ts. */
+.sort, .filter { flex: none; width: 1ch; margin-left: 0.5ch; text-align: center; }
 .resize { position: absolute; top: 0; right: 0; width: 5px; height: 100%; cursor: col-resize; }
 tbody tr:nth-child(even) { --stripe: var(--vscode-keybindingTable-rowsBackground, var(--vscode-list-hoverBackground)); background: var(--stripe); }
 td { background: var(--hl, transparent); }
@@ -354,27 +363,33 @@ td.selected { --hl: var(--vscode-list-inactiveSelectionBackground); color: var(-
 .grid:focus td.selected { --hl: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
 td.pinned, td.rownum { background: linear-gradient(var(--hl, transparent), var(--hl, transparent)), linear-gradient(var(--stripe, transparent), var(--stripe, transparent)), var(--vscode-editor-background); }
 td.focused { outline: 1px solid var(--vscode-list-focusOutline, var(--vscode-focusBorder)); outline-offset: -1px; }
-input { user-select: text; color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); }
-input.find { width: 160px; padding: 2px 4px; }
-label { display: flex; gap: 4px; align-items: center; }
+input { font: inherit; user-select: text; box-sizing: border-box; height: 22px; padding: 0 4px; color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); border-radius: 2px; }
+input::placeholder { color: var(--vscode-input-placeholderForeground); }
+input:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; border-color: var(--vscode-focusBorder); }
+input.find { width: 160px; }
+input[type="checkbox"] { appearance: none; flex: none; position: relative; width: 16px; height: 16px; margin: 0; padding: 0; cursor: pointer; border: 1px solid var(--vscode-checkbox-border, var(--vscode-input-border, var(--vscode-foreground))); border-radius: 3px; background: var(--vscode-checkbox-background, var(--vscode-input-background)); }
+input[type="checkbox"]:focus { outline: none; border-color: var(--vscode-checkbox-border, var(--vscode-input-border, var(--vscode-foreground))); }
+input[type="checkbox"]:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
+input[type="checkbox"]:checked::after { content: ''; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid var(--vscode-checkbox-foreground, var(--vscode-foreground)); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+label { display: flex; gap: 6px; align-items: center; }
 .note, .totals { color: var(--vscode-descriptionForeground); }
 .totals { padding-top: 4px; }
-.filter { margin-left: 4px; padding: 0 2px; color: var(--vscode-descriptionForeground); }
+.filter { padding: 0 0.25ch; color: var(--vscode-descriptionForeground); }
 .filter:hover { color: var(--vscode-foreground); }
 .filter.active { color: var(--vscode-focusBorder); }
-.menu, .popup { position: fixed; z-index: 10; padding: 4px 0; color: var(--vscode-menu-foreground); background: var(--vscode-menu-background); border: 1px solid var(--vscode-menu-border, var(--vscode-widget-border, transparent)); box-shadow: 0 2px 8px var(--vscode-widget-shadow); }
+.menu, .popup { position: fixed; z-index: 10; padding: 4px 0; color: var(--vscode-menu-foreground); background: var(--vscode-menu-background); border: 1px solid var(--vscode-menu-border, var(--vscode-widget-border, transparent)); border-radius: 5px; box-shadow: 0 2px 8px var(--vscode-widget-shadow); }
 .menu { max-height: calc(100vh - 16px); overflow: hidden auto; }
 .menu:focus { outline: none; }
 .menu .item { padding: 2px 16px; cursor: default; }
-.menu .item:hover, .menu .item.active { color: var(--vscode-menu-selectionForeground); background: var(--vscode-menu-selectionBackground); }
-.menu .item[aria-disabled="true"] { opacity: 0.5; background: none; }
+.menu .item:not([aria-disabled="true"]):hover, .menu .item.active { color: var(--vscode-menu-selectionForeground); background: var(--vscode-menu-selectionBackground); }
+.menu .item[aria-disabled="true"] { opacity: 0.5; }
 .menu .separator { margin: 4px 0; border-top: 1px solid var(--vscode-menu-separatorBackground); }
 .popup { display: flex; flex-direction: column; gap: 4px; padding: 6px; max-width: min(360px, calc(100vw - 16px)); max-height: calc(100vh - 16px); }
 .popup .values { max-height: 240px; overflow: hidden auto; }
 .popup .values span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .popup label[hidden] { display: none; }
 .actions { display: flex; gap: 8px; justify-content: flex-end; }
-dialog { max-width: 80vw; max-height: 80vh; color: var(--vscode-foreground); background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border)); }
+dialog { max-width: 80vw; max-height: 80vh; color: var(--vscode-editorWidget-foreground, var(--vscode-foreground)); background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border)); }
 dialog[open] { display: flex; flex-direction: column; }
 dialog .body { min-height: 0; overflow: auto; margin: 0 0 8px; }
 dialog::backdrop { background: var(--vscode-widget-shadow); }

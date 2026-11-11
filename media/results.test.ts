@@ -69,6 +69,8 @@ const copy = () => {
 
 const scrollBox = () => document.querySelector('.grid') as HTMLElement;
 const findField = () => document.querySelector('input.find') as HTMLInputElement;
+const stepButton = (name: 'Previous' | 'Next') =>
+  document.querySelector(`button[aria-label^="${name} Match"]`) as HTMLButtonElement;
 const headerNames = () =>
   [...document.querySelectorAll('th[data-column] .name')].map((node) => node.textContent);
 
@@ -249,9 +251,9 @@ describe('results webview', () => {
     mouse(header('amount') as Element, 'mouseup', {clientX: 150});
     mouse(header('amount') as Element, 'click');
     expect((document.querySelector('col[data-column="2"]') as HTMLElement).style.width).toBe(
-      '138px'
+      '146px'
     );
-    expect((document.querySelector('table') as HTMLElement).style.width).toBe('314px');
+    expect((document.querySelector('table') as HTMLElement).style.width).toBe('338px');
     expect(columnTexts(2)).toEqual(['30', '10', '20']);
 
     mouse(header('name') as Element, 'mousedown', {clientX: 10, buttons: 1});
@@ -284,9 +286,11 @@ describe('results webview', () => {
     });
   });
 
-  // Find must walk the matches in view order both ways and wrap; Esc must clear the marks.
+  // Find must walk the matches in view order both ways and wrap; Esc must clear the marks and
+  // disable the step buttons again.
   it('finds the matches, steps forward and back with a wrap, and clears on Esc', () => {
     render(people('find'));
+    expect([stepButton('Previous').disabled, stepButton('Next').disabled]).toEqual([true, true]);
     expect(keydown(document, {key: 'f', ctrlKey: true}).defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(findField());
     search('0');
@@ -296,7 +300,7 @@ describe('results webview', () => {
       '20'
     ]);
     expect(focused()).toEqual([0, 2]);
-    [...document.querySelectorAll('button')].find((node) => node.textContent === 'Next')?.click();
+    stepButton('Next').click();
     expect(focused()).toEqual([1, 2]);
     keydown(findField(), {key: 'Enter'});
     keydown(findField(), {key: 'Enter'});
@@ -306,6 +310,7 @@ describe('results webview', () => {
     keydown(scrollBox(), {key: 'Escape'});
     expect(findField().value).toBe('');
     expect(document.querySelectorAll('td.match')).toHaveLength(0);
+    expect([stepButton('Previous').disabled, stepButton('Next').disabled]).toEqual([true, true]);
   });
 
   // The global filter does not re-run on a visibility change by itself, so rows that match only in
@@ -388,12 +393,12 @@ describe('results webview', () => {
     choose(header('amount') as Element, 'Pin Column');
     choose(header('note') as Element, 'Pin Column');
     expect(headerNames()).toEqual(['amount', 'note', 'name']);
-    expect([left(2), left(1)]).toEqual(['32px', '120px']);
+    expect([left(2), left(1)]).toEqual(['32px', '128px']);
 
     dragHeader('note', 'amount');
     await tick();
     expect(headerNames()).toEqual(['note', 'amount', 'name']);
-    expect([left(1), left(2)]).toEqual(['32px', '104px']);
+    expect([left(1), left(2)]).toEqual(['32px', '112px']);
     mouse(header('note')?.querySelector('.resize') as Element, 'mousedown', {
       clientX: 100,
       buttons: 1
@@ -401,7 +406,7 @@ describe('results webview', () => {
     mouse(document, 'mousemove', {clientX: 120, buttons: 1});
     mouse(document, 'mouseup', {clientX: 120});
     await tick();
-    expect(left(2)).toBe('124px');
+    expect(left(2)).toBe('132px');
 
     dragHeader('amount', 'name');
     await tick();
