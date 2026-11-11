@@ -55,6 +55,12 @@ const cancels = () => {
 };
 const panel = async () => (await api()).panel;
 const view = async () => (await panel()).view();
+const result = async () => {
+  const current = await view();
+  return current.kind === 'result' ? current : assert.fail(`the panel shows ${current.kind}`);
+};
+/** A clipboard text that no copy of the fixtures gives. */
+const KNOWN = 'not a copy of the results';
 const run = () => vscode.commands.executeCommand('dynotable.run');
 
 const show = (name: string, text = TWO_STATEMENTS) => showFile(name, text);
@@ -235,13 +241,14 @@ describe('run', () => {
     await show('copy.dynotable.sql');
     await run();
     const hook = await panel();
-    await hook.receive({type: 'copy', format: 'csv'});
+    const {resultId} = await result();
+    await hook.receive({type: 'copy', resultId, format: 'csv'});
     const csv = (await vscode.env.clipboard.readText()).split('\r\n');
     assert.deepEqual(csv.slice(0, 2), [
       'o.orderId,o.status,c.country',
       'ORD2024056001,PENDING,Tajikistan'
     ]);
-    await hook.receive({type: 'copy', format: 'json'});
+    await hook.receive({type: 'copy', resultId, format: 'json'});
     const json = JSON.parse(await vscode.env.clipboard.readText()) as unknown[];
     assert.deepEqual(json[0], {
       'o.orderId': 'ORD2024056001',
@@ -253,8 +260,7 @@ describe('run', () => {
   it('unreadable: an answer that is not a result shows one error and keeps the last view', async () => {
     await show('before.dynotable.sql');
     await run();
-    const previous = await view();
-    assert.equal(previous.kind, 'result');
+    const previous = await result();
     fake.handle(`command:${RUN}`, () => ({}));
     await show('unreadable.dynotable.sql');
     await run();
@@ -262,6 +268,32 @@ describe('run', () => {
       {kind: 'error', message: 'DynoTable answered with a result the extension cannot read.'}
     ]);
     assert.deepEqual(await view(), previous);
+    // The restored view's id must still be current, or its copy buttons would copy nothing.
+    await vscode.env.clipboard.writeText(KNOWN);
+    await (await panel()).receive({type: 'copy', resultId: previous.resultId, format: 'csv'});
+    assert.notEqual(await vscode.env.clipboard.readText(), KNOWN);
+  });
+
+  // A grid that still shows an earlier run must not copy the rows of the run after it.
+  it('stale copy: a copy for an earlier result copies nothing', async () => {
+    await vscode.env.clipboard.writeText(KNOWN);
+    await show('stale-copy.dynotable.sql');
+    await run();
+    const first = (await result()).resultId;
+    await run();
+    const current = (await result()).resultId;
+    assert.notEqual(current, first);
+    const selection = {
+      type: 'copySelection',
+      format: 'tsv',
+      rows: [0],
+      columns: [0],
+      header: false
+    };
+    await (await panel()).receive({...selection, resultId: first});
+    assert.equal(await vscode.env.clipboard.readText(), KNOWN);
+    await (await panel()).receive({...selection, resultId: current});
+    assert.notEqual(await vscode.env.clipboard.readText(), KNOWN);
   });
 
   // A `Selection` serializes its anchor and active ends too.

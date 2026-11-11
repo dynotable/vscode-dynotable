@@ -45,10 +45,9 @@ function render(view: View): void {
     case 'result': {
       bar.append(
         element('span', view.summary, 'summary'),
-        button('Copy CSV', {type: 'copy', format: 'csv'}),
-        button('Copy JSON', {type: 'copy', format: 'json'})
+        button('Copy CSV', {type: 'copy', resultId: view.resultId, format: 'csv'}),
+        button('Copy JSON', {type: 'copy', resultId: view.resultId, format: 'json'})
       );
-      root.append(element('pre', view.executedStatement));
       if (view.columns.length === 0) {
         root.append(element('p', 'No rows.'));
         return;
@@ -60,7 +59,7 @@ function render(view: View): void {
       const body = element('tbody');
       for (const row of view.cells) {
         const tr = element('tr');
-        tr.append(...row.map((cell) => element('td', cell)));
+        tr.append(...row.map((cell) => element('td', cell.text)));
         body.append(tr);
       }
       const table = element('table');

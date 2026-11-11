@@ -2,6 +2,7 @@ import {describe, expect, it} from 'vitest';
 import type {RunResult} from './protocol';
 import {
   columnText,
+  copyText,
   delimitedText,
   formatText,
   jsonText,
@@ -9,7 +10,8 @@ import {
   renderHtml,
   resultView,
   summary,
-  toJson
+  toJson,
+  type CopyMessage
 } from './results-model';
 
 const result = (overrides: Partial<RunResult>): RunResult => ({
@@ -54,43 +56,24 @@ describe('summary', () => {
 });
 
 describe('cells', () => {
-  // A path reader would answer "B".
-  it('reads a qualified column as a literal key', () => {
+  // The webview needs the run's id and typed cells, and no longer shows the statement.
+  it('builds the view with the result id and a typed cell per column', () => {
     const view = resultView(
-      result({columns: ['o.orderId'], rows: [{'o.orderId': 'A', o: {orderId: 'B'}}]})
+      result({columns: ['id', 'toString'], rows: [{id: 1}], returnedRows: 1}),
+      'run-1'
     );
-    expect(view.cells).toEqual([['A']]);
-  });
-
-  // `toString` is inherited by every row: a plain `row[column]` would print a function. A SQL Set
-  // keeps its type tag, also inside a map, so it does not read as a list. The columns are not in
-  // sorted order, so a sorted header fails.
-  it('keeps the column order, renders missing keys empty and nested values as JSON', () => {
-    const view = resultView(
-      result({
-        columns: ['id', 'tags', 'nestedMap', 'scores', 'toString'],
-        rows: [
-          {
-            id: 1,
-            tags: ['a', 'b'],
-            nestedMap: {innerLabel: 'inner', innerTags: {SS: ['inner-a', 'inner-b']}},
-            scores: {NS: ['10', '20', '30']}
-          },
-          {id: 2}
+    expect(view).toEqual({
+      kind: 'result',
+      resultId: 'run-1',
+      summary: '1 row · 5 ms',
+      columns: ['id', 'toString'],
+      cells: [
+        [
+          {text: '1', kind: 'number'},
+          {text: '', kind: 'missing'}
         ]
-      })
-    );
-    expect(view.columns).toEqual(['id', 'tags', 'nestedMap', 'scores', 'toString']);
-    expect(view.cells).toEqual([
-      [
-        '1',
-        '["a","b"]',
-        '{"innerLabel":"inner","innerTags":{"SS":["inner-a","inner-b"]}}',
-        '{"NS":["10","20","30"]}',
-        ''
-      ],
-      ['2', '', '', '', '']
-    ]);
+      ]
+    });
   });
 
   // A number JSON cannot hold arrives as {"N": "<exact>"}; the copy must not turn it into a lossy number.
@@ -233,5 +216,123 @@ describe('panel messages', () => {
   it('rejects an unknown type and a cancel whose run id is not a string', () => {
     expect(parseMessage({type: 'eval', code: 'x'})).toBeUndefined();
     expect(parseMessage({type: 'cancel', runId: 1})).toBeUndefined();
+  });
+
+  // A field the parser does not know must not reach the host.
+  it('accepts each copy and export message as a new object with only its fields', () => {
+    expect(
+      parseMessage({
+        type: 'copySelection',
+        resultId: 'r1',
+        format: 'markdown',
+        rows: [2, 0],
+        columns: [1],
+        header: true,
+        extra: 'x'
+      })
+    ).toEqual({
+      type: 'copySelection',
+      resultId: 'r1',
+      format: 'markdown',
+      rows: [2, 0],
+      columns: [1],
+      header: true
+    });
+    expect(
+      parseMessage({type: 'copyValue', resultId: 'r1', row: 0, column: 3, pretty: true})
+    ).toEqual({type: 'copyValue', resultId: 'r1', row: 0, column: 3, pretty: true});
+    expect(parseMessage({type: 'copyColumn', resultId: 'r1', column: 0, rows: [1]})).toEqual({
+      type: 'copyColumn',
+      resultId: 'r1',
+      column: 0,
+      rows: [1]
+    });
+    expect(parseMessage({type: 'copyColumnName', resultId: 'r1', column: 2})).toEqual({
+      type: 'copyColumnName',
+      resultId: 'r1',
+      column: 2
+    });
+    expect(parseMessage({type: 'export', resultId: 'r1'})).toEqual({
+      type: 'export',
+      resultId: 'r1'
+    });
+  });
+
+  // `at` throws on a bad index, and a copy of nothing is not a copy.
+  it('rejects a fractional or negative index, an empty row list and a missing result id', () => {
+    const selection = {
+      type: 'copySelection',
+      resultId: 'r1',
+      format: 'tsv',
+      rows: [0],
+      columns: [0],
+      header: false
+    };
+    expect(parseMessage({...selection, rows: [0.5]})).toBeUndefined();
+    expect(parseMessage({...selection, columns: [-1]})).toBeUndefined();
+    expect(parseMessage({...selection, rows: []})).toBeUndefined();
+    expect(parseMessage({type: 'copy', format: 'csv'})).toBeUndefined();
+  });
+});
+
+describe('copyText', () => {
+  const orders = result({
+    columns: ['id', '$(alert)', 'doc'],
+    rows: [
+      {id: 1, '$(alert)': 'a', doc: {q: [1, 2]}},
+      {id: 2, '$(alert)': 'b'}
+    ]
+  });
+
+  // A copy for an earlier result, or past the end of this one, must copy nothing.
+  it('copies nothing for an old result id or an index out of range', () => {
+    const cases: CopyMessage[] = [
+      {type: 'copyColumnName', resultId: 'old', column: 0},
+      {type: 'copyValue', resultId: 'r1', row: 2, column: 0, pretty: false},
+      {type: 'copyColumnName', resultId: 'r1', column: 3},
+      {
+        type: 'copySelection',
+        resultId: 'r1',
+        format: 'csv',
+        rows: [0],
+        columns: [0, 3],
+        header: true
+      },
+      {type: 'copyColumn', resultId: 'r1', column: 0, rows: [2]}
+    ];
+    for (const message of cases) expect(copyText(orders, 'r1', message)).toBeUndefined();
+  });
+
+  // Copy CSV of an empty result still gives its columns.
+  it('copies the header of a result with columns and no rows', () => {
+    expect(
+      copyText(result({columns: ['a', 'b']}), 'r1', {type: 'copy', resultId: 'r1', format: 'csv'})
+    ).toEqual({text: 'a,b', status: 'Copied 0 rows as CSV.'});
+  });
+
+  // The count is the size of the copy, not the result's returned rows; `$(` would show an icon.
+  it('counts the copied rows and values, and escapes icon syntax in a column name', () => {
+    expect(
+      copyText(orders, 'r1', {
+        type: 'copySelection',
+        resultId: 'r1',
+        format: 'csv',
+        rows: [1],
+        columns: [0],
+        header: true
+      })?.status
+    ).toBe('Copied 1 row as CSV.');
+    expect(
+      copyText(orders, 'r1', {type: 'copyColumn', resultId: 'r1', column: 1, rows: [1, 0]})
+    ).toEqual({text: 'b\na', status: 'Copied 2 values of \\$(alert).'});
+  });
+
+  const jsonValue = (pretty: boolean) =>
+    copyText(orders, 'r1', {type: 'copyValue', resultId: 'r1', row: 0, column: 2, pretty})?.text;
+
+  // The viewer copies the indented form; the grid copies the value as the cell shows it.
+  it('copies a JSON value indented only when pretty is set', () => {
+    expect(jsonValue(true)).toBe('{\n  "q": [\n    1,\n    2\n  ]\n}');
+    expect(jsonValue(false)).toBe('{"q":[1,2]}');
   });
 });

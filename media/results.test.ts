@@ -25,10 +25,10 @@ describe('results webview', () => {
     const hostile = '<img src=x onerror="alert(1)">';
     render({
       kind: 'result',
+      resultId: 'hostile',
       summary: hostile,
       columns: [hostile],
-      cells: [[hostile]],
-      executedStatement: hostile
+      cells: [[{text: hostile, kind: 'string'}]]
     });
     expect(document.querySelectorAll('img')).toHaveLength(0);
     expect(document.querySelector('th')?.textContent).toBe(hostile);
@@ -36,9 +36,21 @@ describe('results webview', () => {
   });
 
   it('renders an empty result with no grid', () => {
-    render({kind: 'result', summary: '0 rows', columns: [], cells: [], executedStatement: 'x'});
+    render({kind: 'result', resultId: 'empty', summary: '0 rows', columns: [], cells: []});
     expect(document.querySelector('table')).toBeNull();
     expect(document.body.textContent).toContain('No rows.');
+  });
+
+  // The host copies only from the result the id names, so a stale button copies nothing.
+  it('copies CSV and JSON with the id of the result it shows', () => {
+    render({kind: 'result', resultId: 'copy-1', summary: '0 rows', columns: [], cells: []});
+    const buttons = [...document.querySelectorAll('button')];
+    buttons.find((node) => node.textContent === 'Copy CSV')?.click();
+    buttons.find((node) => node.textContent === 'Copy JSON')?.click();
+    expect(posted.slice(-2)).toEqual([
+      {type: 'copy', resultId: 'copy-1', format: 'csv'},
+      {type: 'copy', resultId: 'copy-1', format: 'json'}
+    ]);
   });
 
   // The host acts only on the run the cancel names.

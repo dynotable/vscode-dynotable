@@ -514,37 +514,37 @@ scripts outside the repository.
 - Modify: `media/results.ts`, `media/results.test.ts`
 - Modify: `src/test-integration/run.test.ts`, `src/test-integration/live.test.ts`
 
-- [ ] `ResultView`: remove `executedStatement`, add `resultId`, make the cells `{text, kind}`;
+- [x] `ResultView`: remove `executedStatement`, add `resultId`, make the cells `{text, kind}`;
       `resultView(result, resultId)`
-- [ ] `parseMessage`: accept `copy`, `copySelection`, `copyValue`, `copyColumn`, `copyColumnName` and
+- [x] `parseMessage`: accept `copy`, `copySelection`, `copyValue`, `copyColumn`, `copyColumnName` and
       `export` with `resultId`, non-negative integer indices and non-empty lists; reject any other shape
-- [ ] add `copyText(result, resultId, message)` returning `{text, status}` or `undefined`, with the
+- [x] add `copyText(result, resultId, message)` returning `{text, status}` or `undefined`, with the
       status texts, the singular forms and the `$(` escape
-- [ ] `ResultsPanel`: store `run.id` as the current `resultId` together with `this.result`, on success
+- [x] `ResultsPanel`: store `run.id` as the current `resultId` together with `this.result`, on success
       only; send every copy message through `copyText`; show `The results changed. Copy again.` for a
       stale id; add a public `runResult` getter, and `runResult()` to `TestApi.panel` in
       `src/extension.ts`
-- [ ] `media/results.ts`: the minimum to compile and keep working: render `cell.text`, send `resultId`
+- [x] `media/results.ts`: the minimum to compile and keep working: render `cell.text`, send `resultId`
       with Copy CSV and Copy JSON, no statement block; update the jsdom fixtures to the new view shape
-- [ ] `live.test.ts:318`: read `executedStatement` from `(await api()).panel.runResult()`
-- [ ] test `parseMessage`: one accept case per new type (`copySelection`, `copyValue` with `pretty`,
+- [x] `live.test.ts:318`: read `executedStatement` from `(await api()).panel.runResult()`
+- [x] test `parseMessage`: one accept case per new type (`copySelection`, `copyValue` with `pretty`,
       `copyColumn`, `copyColumnName`, `export`) gives the exact parsed object; a fractional index, `-1`, an
       empty `rows` in `copySelection` and a message with no `resultId` are rejected
-- [ ] test `copyText`: an old `resultId`, `copyValue` with `row: rows.length`, `copyColumnName` with
+- [x] test `copyText`: an old `resultId`, `copyValue` with `row: rows.length`, `copyColumnName` with
       `column: columns.length`, `copySelection` with an unknown column index, and `copyColumn` with
       `rows: [rows.length]` each return
       `undefined`; toolbar `copy` on a result with columns and no rows returns the header; `copySelection` status counts the selection (`Copied 1 row as
       CSV.` for one row); `copyColumn` on a column named `$(alert)` gives `Copied 2 values of
       \$(alert).`; `copyValue` on a json cell gives the literal indented text with `pretty: true` and the compact
       text with `pretty: false`
-- [ ] cut the old `resultView` cells tests (`src/results-model.test.ts:47`, `:57`) to one wiring case
+- [x] cut the old `resultView` cells tests (`src/results-model.test.ts:47`, `:57`) to one wiring case
       (the cell rules, the dotted key too, now live in `grid-model.test.ts`)
-- [ ] jsdom test: clicking Copy CSV and Copy JSON posts `copy` with the format and the `resultId`
-- [ ] integration: update the copy test to send `resultId`; add the stale case (put a known text on the
+- [x] jsdom test: clicking Copy CSV and Copy JSON posts `copy` with the format and the `resultId`
+- [x] integration: update the copy test to send `resultId`; add the stale case (put a known text on the
       clipboard, run twice, send `copySelection` with the first run's id, the clipboard still holds the
       known text; then the same message with the current id changes the clipboard); extend the unreadable test (`run.test.ts:253`): write a known text to the clipboard,
       then after the unreadable answer a copy with `(await view()).resultId` replaces it
-- [ ] run `pnpm typecheck`, `pnpm test` and `pnpm test:integration` - must pass before task 6
+- [x] run `pnpm typecheck`, `pnpm test` and `pnpm test:integration` - must pass before task 6
 
 ### Task 6: Add Export
 

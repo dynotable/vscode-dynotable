@@ -2,11 +2,10 @@ import {randomUUID} from 'node:crypto';
 import * as vscode from 'vscode';
 import {is, runResultSchema, type RunResult} from './protocol';
 import {
-  formatText,
+  copyText,
   parseMessage,
   renderHtml,
   resultView,
-  toJson,
   type RenderMessage,
   type View
 } from './results-model';
@@ -22,7 +21,8 @@ export type RunOutcome =
 export class ResultsPanel implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
   private view: View = {kind: 'empty'};
-  private result: RunResult | undefined;
+  /** Set on success only, so a failed run that restores the old view keeps the old id current. */
+  private result: {value: RunResult; id: string} | undefined;
   private run: {id: string; source: vscode.CancellationTokenSource} | undefined;
   /** The last run's outcome, for the Test-mode hook. */
   last: RunOutcome | undefined;
@@ -32,6 +32,10 @@ export class ResultsPanel implements vscode.Disposable {
 
   get current(): View {
     return this.view;
+  }
+
+  get runResult(): RunResult | undefined {
+    return this.result?.value;
   }
 
   /**
@@ -62,8 +66,8 @@ export class ResultsPanel implements vscode.Disposable {
         this.show(before);
         return (this.last = {kind: 'unreadable'});
       }
-      this.result = answer;
-      this.show(resultView(answer));
+      this.result = {value: answer, id: run.id};
+      this.show(resultView(answer, run.id));
       return (this.last = {kind: 'ok'});
     } catch (error) {
       const cancelled = run.source.token.isCancellationRequested;
@@ -85,23 +89,18 @@ export class ResultsPanel implements vscode.Disposable {
       case 'cancel':
         if (message.runId === this.run?.id) this.run.source.cancel();
         return;
-      case 'copy': {
-        if (!this.result) return;
-        const text =
-          message.format === 'csv'
-            ? formatText(
-                this.result,
-                [...this.result.rows.keys()],
-                [...this.result.columns.keys()],
-                'csv',
-                true
-              )
-            : toJson(this.result);
-        await vscode.env.clipboard.writeText(text);
-        vscode.window.setStatusBarMessage(
-          `Copied ${this.result.returnedRows} rows as ${message.format.toUpperCase()}.`,
-          COPIED_MESSAGE_MS
-        );
+      case 'copy':
+      case 'copySelection':
+      case 'copyValue':
+      case 'copyColumn':
+      case 'copyColumnName': {
+        const copy = this.result && copyText(this.result.value, this.result.id, message);
+        if (copy) {
+          await vscode.env.clipboard.writeText(copy.text);
+          vscode.window.setStatusBarMessage(copy.status, COPIED_MESSAGE_MS);
+        } else if (message.resultId !== this.result?.id) {
+          vscode.window.setStatusBarMessage('The results changed. Copy again.', COPIED_MESSAGE_MS);
+        }
       }
     }
   }
