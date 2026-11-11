@@ -91,6 +91,21 @@ A person prepares these. The live tests fail when one is missing.
       definition, highlight and rename outside SQL; OpenSearch lenses and inlay hints), the test
       checks only that the request does not fail.
 
+## Results grid
+
+The unit tests run the grid in jsdom. jsdom has no layout, and there VS Code sends no native copy.
+So a person checks these in VS Code.
+
+- [ ] Cmd+C (Ctrl+C) on one cell copies its value. On a range, it copies tab-separated text. —
+      manual
+- [ ] Cmd+A (Ctrl+A) in the grid selects all cells. In the find field, it selects the field text. —
+      manual
+- [ ] Cmd+F (Ctrl+F) moves the focus to the find field. — manual
+- [ ] Drag a header edge: the column width changes. Drag a header onto another header: the column
+      moves. Neither drag sorts. — manual
+- [ ] In a pinned column, the arrow keys scroll the grid only vertically. — manual
+- [ ] Export writes the file in the format that you pick. — manual
+
 ## Failure paths
 
 Each one shows its own sentence once, with Reconnect among its actions.
