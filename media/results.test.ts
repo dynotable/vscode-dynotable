@@ -88,8 +88,12 @@ const dialogButton = (label: string) =>
   [...document.querySelectorAll<HTMLButtonElement>('dialog button')].find(
     (node) => node.textContent === label
   ) as HTMLButtonElement;
-const openFilter = (name: string) =>
-  ((header(name) as HTMLElement).querySelector('.filter') as HTMLElement).click();
+const filterIcon = (name: string) =>
+  (header(name) as HTMLElement).querySelector('.filter') as HTMLElement;
+const openFilter = (name: string) => {
+  mouse(filterIcon(name), 'mousedown');
+  filterIcon(name).click();
+};
 const filterOption = (label: string) =>
   [...document.querySelectorAll('.popup label')]
     .find((node) => node.textContent === label)
@@ -98,6 +102,37 @@ const popupButton = (label: string) =>
   [...document.querySelectorAll<HTMLButtonElement>('.popup button')].find(
     (node) => node.textContent === label
   ) as HTMLButtonElement;
+
+const tick = () => new Promise((resolve) => setTimeout(resolve));
+const filterRowsBox = () =>
+  document.querySelector('.bar input[type="checkbox"]') as HTMLInputElement;
+/** Filter rows keeps its state while the document lives, so a failed test must not leave it on. */
+const withFilterRows = (run: () => void) => {
+  filterRowsBox().click();
+  try {
+    run();
+  } finally {
+    if (filterRowsBox()?.checked) filterRowsBox().click();
+  }
+};
+const search = (query: string) => {
+  findField().value = query;
+  findField().dispatchEvent(new Event('input'));
+  keydown(findField(), {key: 'Enter'});
+};
+const focused = () => {
+  const td = document.querySelector('td.focused') as HTMLElement;
+  return [Number(td.dataset.row), Number(td.dataset.column)];
+};
+const width = (column: number) =>
+  (document.querySelector(`col[data-column="${column}"]`) as HTMLElement).style.width;
+const left = (column: number) =>
+  (document.querySelector(`td.pinned[data-column="${column}"]`) as HTMLElement).style.left;
+const dragHeader = (from: string, to: string) => {
+  mouse(header(from) as Element, 'mousedown', {clientX: 10, buttons: 1});
+  mouse(document, 'mousemove', {clientX: 200, buttons: 1});
+  mouse(header(to) as Element, 'mouseup', {clientX: 200});
+};
 
 beforeAll(async () => {
   Object.assign(globalThis, {
@@ -232,14 +267,214 @@ describe('results webview', () => {
   // every row.
   it('filters rows on a column whose first cell is missing', () => {
     render(people('filter'));
-    const filterRows = document.querySelector('input[type="checkbox"]') as HTMLInputElement;
-    filterRows.click();
-    findField().value = 'vip';
-    findField().dispatchEvent(new Event('input'));
+    withFilterRows(() => {
+      search('vip');
+      expect(columnTexts(0)).toEqual(['Bob']);
+      expect(document.querySelector('.note')?.textContent).toBe('1 of 3 rows shown');
+    });
+  });
+
+  // Find must walk the matches in view order both ways and wrap; Esc must clear the marks.
+  it('finds the matches, steps forward and back with a wrap, and clears on Esc', () => {
+    render(people('find'));
+    expect(keydown(document, {key: 'f', ctrlKey: true}).defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(findField());
+    search('0');
+    expect([...document.querySelectorAll('td.match')].map((td) => td.textContent)).toEqual([
+      '30',
+      '10',
+      '20'
+    ]);
+    expect(focused()).toEqual([0, 2]);
+    [...document.querySelectorAll('button')].find((node) => node.textContent === 'Next')?.click();
+    expect(focused()).toEqual([1, 2]);
     keydown(findField(), {key: 'Enter'});
-    expect(columnTexts(0)).toEqual(['Bob']);
-    expect(document.querySelector('.note')?.textContent).toBe('1 of 3 rows shown');
-    filterRows.click();
+    keydown(findField(), {key: 'Enter'});
+    expect(focused()).toEqual([0, 2]);
+    keydown(findField(), {key: 'Enter', shiftKey: true});
+    expect(focused()).toEqual([2, 2]);
+    keydown(scrollBox(), {key: 'Escape'});
+    expect(findField().value).toBe('');
+    expect(document.querySelectorAll('td.match')).toHaveLength(0);
+  });
+
+  // The global filter does not re-run on a visibility change by itself, so rows that match only in
+  // a hidden column would stay. A focus left on a hidden column would make the arrows jump to the
+  // first column.
+  it('re-runs Filter rows on hide and show, and moves the focus off a hidden column', () => {
+    render(people('visibility'));
+    withFilterRows(() => {
+      search('vip');
+      expect(columnTexts(0)).toEqual(['Bob']);
+      choose(header('note') as Element, 'Hide Column');
+      expect(columnTexts(0)).toEqual([]);
+      choose(header('name') as Element, 'Show All Columns');
+      expect(columnTexts(0)).toEqual(['Bob']);
+    });
+    keydown(scrollBox(), {key: 'Escape'});
+
+    mouse(cell(0, 1), 'click');
+    choose(header('note') as Element, 'Hide Column');
+    keydown(scrollBox(), {key: 'ArrowDown'});
+    scrollBox().focus();
+    copy();
+    expect(posted.at(-1)).toEqual({
+      type: 'copyValue',
+      resultId: 'visibility',
+      row: 1,
+      column: 2,
+      pretty: false
+    });
+  });
+
+  // Add-click selects the rows × columns cross; Shift+arrows extend from the anchor; Cmd/Ctrl+A
+  // selects every shown cell.
+  it('selects by add-click, Shift+arrows and select-all', () => {
+    render(people('select-keys'));
+    mouse(cell(0, 0), 'click');
+    mouse(cell(1, 2), 'click', {ctrlKey: true});
+    scrollBox().focus();
+    copy();
+    expect(posted.at(-1)).toMatchObject({type: 'copySelection', rows: [0, 1], columns: [0, 2]});
+
+    mouse(cell(0, 0), 'click');
+    keydown(scrollBox(), {key: 'ArrowDown', shiftKey: true});
+    keydown(scrollBox(), {key: 'ArrowDown', shiftKey: true});
+    keydown(scrollBox(), {key: 'ArrowRight', shiftKey: true});
+    copy();
+    expect(posted.at(-1)).toMatchObject({type: 'copySelection', rows: [0, 1, 2], columns: [0, 1]});
+
+    keydown(scrollBox(), {key: 'a', ctrlKey: true});
+    copy();
+    expect(posted.at(-1)).toMatchObject({
+      type: 'copySelection',
+      rows: [0, 1, 2],
+      columns: [0, 1, 2]
+    });
+    // VS Code's own webview menu would show over the row numbers.
+    expect(mouse(rowNumber(0), 'contextmenu')).toBe(false);
+  });
+
+  // Pinned columns stay first in their own order; a sticky cell needs the widths of the pinned
+  // columns before it, after a move and after a resize too.
+  it('reorders inside the pinned group only, offsets the pinned cells and unpins to the front', async () => {
+    render(people('pins'));
+    choose(header('amount') as Element, 'Pin Column');
+    choose(header('note') as Element, 'Pin Column');
+    expect(headerNames()).toEqual(['amount', 'note', 'name']);
+    expect([left(2), left(1)]).toEqual(['32px', '120px']);
+
+    dragHeader('note', 'amount');
+    await tick();
+    expect(headerNames()).toEqual(['note', 'amount', 'name']);
+    expect([left(1), left(2)]).toEqual(['32px', '104px']);
+    mouse(header('note')?.querySelector('.resize') as Element, 'mousedown', {
+      clientX: 100,
+      buttons: 1
+    });
+    mouse(document, 'mousemove', {clientX: 120, buttons: 1});
+    mouse(document, 'mouseup', {clientX: 120});
+    await tick();
+    expect(left(2)).toBe('124px');
+
+    dragHeader('amount', 'name');
+    await tick();
+    expect(headerNames()).toEqual(['note', 'amount', 'name']);
+    choose(header('amount') as Element, 'Unpin Column');
+    expect(headerNames()).toEqual(['note', 'amount', 'name']);
+    expect(header('amount')?.classList.contains('pinned')).toBe(false);
+  });
+
+  // A popup that shows only some values must act on those only; the empty entry stands for the
+  // missing and null cells, not for a text.
+  it('filters a column by its empty entry and its shown values, and clears the filter', () => {
+    render(amounts('values'));
+    openFilter('amount');
+    filterOption('(empty)').click();
+    popupButton('Apply').click();
+    expect(columnTexts(0)).toEqual(['10', '9', '2']);
+    expect(filterIcon('amount').classList.contains('active')).toBe(true);
+
+    openFilter('amount');
+    const field = document.querySelector('.popup input:not([type])') as HTMLInputElement;
+    field.value = '1';
+    field.dispatchEvent(new Event('input'));
+    filterOption('Select All').click();
+    popupButton('Apply').click();
+    expect(columnTexts(0)).toEqual(['9', '2']);
+
+    openFilter('amount');
+    popupButton('Clear').click();
+    expect(columnTexts(0)).toEqual(['10', 'null', '9', '', '2']);
+    expect(filterIcon('amount').classList.contains('active')).toBe(false);
+
+    // The mousedown on the icon closes the popup; the click that follows must not open it again.
+    openFilter('amount');
+    openFilter('amount');
+    expect(document.querySelector('.popup')).toBeNull();
+  });
+
+  it('runs the header and cell menu actions on the column and row they name', () => {
+    render(people('menu-actions'));
+    choose(header('amount') as Element, 'Sort Descending');
+    expect(columnTexts(2)).toEqual(['30', '20', '10']);
+    choose(header('amount') as Element, 'Sort Ascending');
+    expect(columnTexts(2)).toEqual(['10', '20', '30']);
+    choose(header('amount') as Element, 'Clear Sort');
+    expect(columnTexts(2)).toEqual(['30', '10', '20']);
+
+    choose(header('name') as Element, 'Select Column');
+    scrollBox().focus();
+    copy();
+    expect(posted.at(-1)).toMatchObject({type: 'copySelection', rows: [0, 1, 2], columns: [0]});
+
+    choose(header('name') as Element, 'Hide Other Columns');
+    expect(headerNames()).toEqual(['name']);
+    choose(cell(0, 0), 'Show All Columns');
+    expect(headerNames()).toEqual(['name', 'note', 'amount']);
+    contextMenu(cell(0, 0));
+    expect(disabled('Show All Columns')).toBe(true);
+
+    choose(cell(1, 0), 'Record View');
+    const amount = document
+      .querySelectorAll('dialog table.record tr')[3]
+      ?.querySelectorAll('td')[1];
+    mouse(amount as Element, 'dblclick');
+    expect(document.querySelector('dialog .title')?.textContent).toBe('amount · row 2');
+    expect(document.querySelector('dialog pre')?.textContent).toBe('10');
+    dialogButton('Close').click();
+  });
+
+  // A long value must not take the whole panel, and a drag must end when the button comes up
+  // outside the frame or the frame loses the focus; Reset Column Widths gives the fit widths back.
+  it('clamps the fit widths, ends a drag on release outside or blur, and resets the widths', async () => {
+    render({
+      kind: 'result',
+      resultId: 'widths',
+      summary: '1 row',
+      columns: ['long', 'a'],
+      cells: [[text('x'.repeat(100)), text('x')]]
+    });
+    expect([width(0), width(1)]).toEqual(['400px', '60px']);
+    const edge = () => header('a')?.querySelector('.resize') as Element;
+
+    mouse(edge(), 'mousedown', {clientX: 100, buttons: 1});
+    mouse(document, 'mousemove', {clientX: 120, buttons: 0});
+    mouse(document, 'mousemove', {clientX: 150, buttons: 1});
+    expect(width(1)).toBe('60px');
+
+    mouse(edge(), 'mousedown', {clientX: 100, buttons: 1});
+    window.dispatchEvent(new Event('blur'));
+    mouse(document, 'mousemove', {clientX: 150, buttons: 1});
+    expect(width(1)).toBe('60px');
+
+    mouse(edge(), 'mousedown', {clientX: 100, buttons: 1});
+    mouse(document, 'mousemove', {clientX: 150, buttons: 1});
+    mouse(document, 'mouseup', {clientX: 150});
+    await tick();
+    expect(width(1)).toBe('110px');
+    choose(header('a') as Element, 'Reset Column Widths');
+    expect(width(1)).toBe('60px');
   });
 
   it('shows the totals for two selected numbers of the focused column, not for one', () => {
@@ -255,7 +490,7 @@ describe('results webview', () => {
 
   // Every copy names original rows and column indices in view order. A copy that sent view
   // positions, or columns in definition order, would copy other cells than the ones shown.
-  it('copies the shown cells by original row and column through sort, hide, reorder and pin', () => {
+  it('copies the shown cells by original row and column through sort, hide, reorder and pin', async () => {
     render({
       kind: 'result',
       resultId: 'wiring',
@@ -270,9 +505,8 @@ describe('results webview', () => {
     header('amount')?.click();
     header('amount')?.click();
     choose(header('note') as Element, 'Hide Column');
-    mouse(header('name') as Element, 'mousedown', {clientX: 10, buttons: 1});
-    mouse(document, 'mousemove', {clientX: 200, buttons: 1});
-    mouse(header('o.orderId') as Element, 'mouseup', {clientX: 200});
+    dragHeader('name', 'o.orderId');
+    await tick();
     choose(header('amount') as Element, 'Pin Column');
     expect(headerNames()).toEqual(['amount', 'name', 'o.orderId']);
 
@@ -323,6 +557,7 @@ describe('results webview', () => {
     mouse(rowNumber(0), 'click');
     mouse(rowNumber(2), 'click', {shiftKey: true});
     header('amount')?.click();
+    expect(columnTexts(2)).toEqual(['30', '10', '20']);
     scrollBox().focus();
     copy();
     expect(posted.at(-1)).toEqual({
