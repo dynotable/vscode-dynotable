@@ -23,14 +23,18 @@ import {storeReactivityBindings} from '@tanstack/table-core/store-reactivity-bin
 import {
   cellMatches,
   compareCells,
+  distinctValues,
   fitWidth,
+  inValueSet,
   isEmpty,
   isNumericColumn,
+  jsonTokens,
   prettyText,
   selectionCells,
   totals,
   type Cell,
-  type GridSelection
+  type GridSelection,
+  type ValueSet
 } from '../src/grid-model';
 import type {PanelMessage, ResultView, View} from '../src/results-model';
 
@@ -71,6 +75,8 @@ interface FindFilter {
 interface Grid {
   view: ResultView;
   table: Table<typeof features, GridRow>;
+  /** The `fitWidth` sizes, for Reset Column Widths. */
+  fitSizing: Record<string, number>;
   rowNumberWidth: number;
   selection: GridSelection;
   focus?: Point;
@@ -103,6 +109,9 @@ let totalsLine: HTMLElement | undefined;
 let drag: Drag | undefined;
 /** Set by a drag that moved, so the click that follows its mouseup does not sort. */
 let suppressClick = false;
+/** The open menu or column filter popup; at most one is open. */
+let popup: HTMLElement | undefined;
+let dialog: HTMLDialogElement | undefined;
 
 /** On macOS a Ctrl-click is a right-click, so Cmd adds there. */
 const MAC = navigator.platform.startsWith('Mac');
@@ -174,7 +183,9 @@ function createGrid(view: ResultView): Grid {
       },
       sortUndefined: 'last',
       sortDescFirst: false,
-      sortFn: (a, b, id) => compareCells(a.getValue<Cell>(id), b.getValue<Cell>(id), numeric)
+      sortFn: (a, b, id) => compareCells(a.getValue<Cell>(id), b.getValue<Cell>(id), numeric),
+      filterFn: (row, id, filter: ValueSet) =>
+        inValueSet(row.original.cells[Number(id)] ?? MISSING, filter)
     };
   });
   const table = constructTable({
@@ -193,6 +204,7 @@ function createGrid(view: ResultView): Grid {
   return {
     view,
     table,
+    fitSizing: columnSizing,
     rowNumberWidth: (Math.max(digits, 2) + 2) * width,
     selection: {rows: new Set(), columns: new Set(), wholeRows: false},
     query: '',
@@ -298,6 +310,7 @@ function rebuildTable(): void {
     th.append(
       element('span', view.columns[Number(column.id)] ?? '', 'name'),
       element('span', sorted ? SORT_MARK[sorted] : '', 'sort'),
+      filterIcon(column.id, column.getIsFiltered()),
       element('span', undefined, 'resize')
     );
     th.addEventListener('click', (event) => {
@@ -516,14 +529,20 @@ function findControls(query: string): HTMLElement[] {
   ];
 }
 
-function resize(id: string, width: number): void {
+/** A width change keeps the table; it updates the widths, the table width and the sticky offsets. */
+function applyWidths(): void {
   if (!grid || !scrollBox) return;
-  grid.table.setColumnSizing((old) => ({...old, [id]: width}));
-  const col = scrollBox.querySelector<HTMLElement>(`col[data-column="${id}"]`);
-  if (col) col.style.width = `${width}px`;
+  const {table} = grid;
+  for (const col of scrollBox.querySelectorAll<HTMLElement>('col[data-column]'))
+    col.style.width = `${table.getColumn(col.dataset.column ?? '')?.getSize() ?? MIN_WIDTH}px`;
   const node = scrollBox.querySelector('table');
-  if (node) node.style.width = `${grid.rowNumberWidth + grid.table.getTotalSize()}px`;
+  if (node) node.style.width = `${grid.rowNumberWidth + table.getTotalSize()}px`;
   layoutSticky();
+}
+
+function resize(id: string, width: number): void {
+  grid?.table.setColumnSizing((old) => ({...old, [id]: width}));
+  applyWidths();
 }
 
 /** Moves `source` to the place of `target`: after it when it moves right, before it when left. */
@@ -533,23 +552,22 @@ function moved(ids: string[], source: string, target: string): string[] {
   return out;
 }
 
+/** Every column id in `columnOrder` order; an empty `columnOrder` means definition order. */
+function fullOrder(current: Grid): string[] {
+  const order = current.table.atoms.columnOrder?.get() ?? [];
+  const ids = current.view.columns.map((_, index) => String(index));
+  return [...order.filter((id) => ids.includes(id)), ...ids.filter((id) => !order.includes(id))];
+}
+
 /** Pinned columns come first whatever `columnOrder` says, so each group reorders on its own. */
 function reorder(source: string, target: string): void {
   if (!grid) return;
-  const {table, view} = grid;
+  const {table} = grid;
   const pinned = table.atoms.columnPinning?.get().start ?? [];
   if (pinned.includes(source) !== pinned.includes(target)) return;
   if (pinned.includes(source))
     table.setColumnPinning((old) => ({...old, start: moved(old.start, source, target)}));
-  else {
-    const order = table.atoms.columnOrder?.get() ?? [];
-    const ids = view.columns.map((_, index) => String(index));
-    const full = [
-      ...order.filter((id) => ids.includes(id)),
-      ...ids.filter((id) => !order.includes(id))
-    ];
-    table.setColumnOrder(moved(full, source, target));
-  }
+  else table.setColumnOrder(moved(fullOrder(grid), source, target));
   rebuildTable();
 }
 
@@ -557,7 +575,7 @@ function startDrag(event: MouseEvent): void {
   const target = event.target as Element;
   const th = target.closest('th[data-column]');
   const column = th instanceof HTMLElement ? th.dataset.column : undefined;
-  if (event.button !== 0 || !grid || column === undefined) return;
+  if (event.button !== 0 || !grid || column === undefined || target.closest('.filter')) return;
   drag = {
     kind: target.closest('.resize') ? 'resize' : 'reorder',
     column,
@@ -583,7 +601,13 @@ function onGridKey(event: KeyboardEvent): void {
   } else if (addModifier(event) && event.key.toLowerCase() === 'a') {
     event.preventDefault();
     selectAll();
-  } else if (event.key === 'Escape') clearQuery();
+  } else if (event.key === 'Enter' && event.shiftKey && grid?.focus) {
+    event.preventDefault();
+    openViewer(grid.focus);
+  } else if (event.key === 'Escape') {
+    if (popup) closePopup();
+    else clearQuery();
+  }
 }
 
 /** A JSON cell's tooltip is built on the first hover, not for every cell up front. */
@@ -592,6 +616,415 @@ function showTooltip(event: MouseEvent): void {
   if (!(td instanceof HTMLElement) || td.title || !grid) return;
   const cell = grid.view.cells[Number(td.dataset.row)]?.[Number(td.dataset.column)];
   if (cell) td.title = prettyText(cell.text, 'json').slice(0, TOOLTIP_LENGTH);
+}
+
+const columnName = (column: number) => grid?.view.columns[column] ?? '';
+
+/** The position of an original row in the view, 1…N. */
+const rowNumber = (row: number) => (grid?.viewRows.indexOf(row) ?? -1) + 1;
+
+function closePopup(): void {
+  if (!popup) return;
+  popup.remove();
+  popup = undefined;
+  if (scrollBox?.isConnected) scrollBox.focus({preventScroll: true});
+}
+
+/** A render that changes the kind or the `resultId` closes everything, with no focus move. */
+function closeAll(): void {
+  popup?.remove();
+  popup = undefined;
+  const open = dialog;
+  dialog = undefined;
+  open?.close();
+}
+
+/** Fixed at the given point, moved left and up when it would leave the window. */
+function placePopup(node: HTMLElement, x: number, y: number): void {
+  closePopup();
+  root.append(node);
+  const {width, height} = node.getBoundingClientRect();
+  node.style.left = `${Math.max(0, Math.min(x, window.innerWidth - width))}px`;
+  node.style.top = `${Math.max(0, Math.min(y, window.innerHeight - height))}px`;
+  popup = node;
+}
+
+interface MenuItem {
+  label: string;
+  run: () => void;
+  disabled?: boolean;
+}
+
+function openMenu(entries: (MenuItem | 'separator')[], x: number, y: number): void {
+  const menu = element('div', undefined, 'menu');
+  menu.setAttribute('role', 'menu');
+  menu.tabIndex = -1;
+  const items: HTMLElement[] = [];
+  for (const entry of entries) {
+    if (entry === 'separator') {
+      menu.append(element('div', undefined, 'separator'));
+      continue;
+    }
+    const item = element('div', entry.label, 'item');
+    item.setAttribute('role', 'menuitem');
+    if (entry.disabled) item.setAttribute('aria-disabled', 'true');
+    else {
+      item.addEventListener('click', () => {
+        closePopup();
+        entry.run();
+      });
+      items.push(item);
+    }
+    menu.append(item);
+  }
+  let active = -1;
+  menu.addEventListener('keydown', (event) => {
+    const move = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
+    if (move !== 0 && items.length > 0) {
+      event.preventDefault();
+      active =
+        active < 0
+          ? move > 0
+            ? 0
+            : items.length - 1
+          : (active + move + items.length) % items.length;
+      items.forEach((item, index) => item.classList.toggle('active', index === active));
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      items[active]?.click();
+    } else if (event.key === 'Escape') closePopup();
+  });
+  placePopup(menu, x, y);
+  menu.focus();
+}
+
+/** One dialog at a time: opening one closes the one before. */
+function openDialog(title: string, body: HTMLElement, buttons: HTMLButtonElement[]): void {
+  closePopup();
+  const old = dialog;
+  dialog = undefined;
+  old?.close();
+  old?.remove();
+  const node = element('dialog');
+  const actions = element('div', undefined, 'actions');
+  actions.append(
+    ...buttons,
+    action('Close', () => node.close())
+  );
+  node.append(element('div', title, 'title'), body, actions);
+  // Esc closes a modal dialog natively and fires `close` too.
+  node.addEventListener('close', () => {
+    node.remove();
+    if (dialog !== node) return;
+    dialog = undefined;
+    if (scrollBox?.isConnected) scrollBox.focus({preventScroll: true});
+  });
+  root.append(node);
+  dialog = node;
+  node.showModal();
+}
+
+function openViewer(point: Point): void {
+  if (!grid) return;
+  const {row, column} = point;
+  const cell = cellAt(row, column);
+  const pretty = prettyText(cell.text, cell.kind);
+  const body = element('pre', undefined, 'viewer');
+  if (cell.kind === 'json' || pretty !== cell.text)
+    for (const token of jsonTokens(pretty))
+      body.append(
+        token.kind === 'space' ? token.text : element('span', token.text, `tok-${token.kind}`)
+      );
+  else body.textContent = pretty;
+  openDialog(`${columnName(column)} · row ${rowNumber(row)}`, body, [
+    button('Copy', {type: 'copyValue', resultId: grid.view.resultId, row, column, pretty: true})
+  ]);
+}
+
+function openRecord(row: number): void {
+  if (!grid) return;
+  const table = element('table', undefined, 'record');
+  const head = element('tr');
+  head.append(element('th', 'Column'), element('th', 'Value'));
+  table.append(head);
+  for (const column of grid.viewColumns) {
+    const cell = cellAt(row, column);
+    const value = element('td', cell.text, cell.kind);
+    value.addEventListener('dblclick', () => openViewer({row, column}));
+    const tr = element('tr');
+    tr.append(element('td', columnName(column)), value);
+    table.append(tr);
+  }
+  openDialog(`Row ${rowNumber(row)}`, table, []);
+}
+
+/** Visibility does not re-run the global filter, so a fresh filter value forces it. */
+function refilter(current: Grid): void {
+  current.table.setGlobalFilter((old: FindFilter | undefined) => old && {...old});
+}
+
+/** A hidden column's filter would hide rows that the user cannot see the reason for. */
+function hideColumns(ids: string[]): void {
+  if (!grid) return;
+  grid.table.setColumnVisibility((old) => ({
+    ...old,
+    ...Object.fromEntries(ids.map((id) => [id, false]))
+  }));
+  grid.table.setColumnFilters((old) => old.filter((filter) => !ids.includes(filter.id)));
+  refilter(grid);
+  rebuildTable();
+}
+
+function showAllColumns(): void {
+  if (!grid) return;
+  grid.table.setColumnVisibility({});
+  refilter(grid);
+  rebuildTable();
+}
+
+function sortBy(id: string, desc: boolean | undefined): void {
+  grid?.table.setSorting(desc === undefined ? [] : [{id, desc}]);
+  rebuildTable();
+}
+
+/** Unpin puts the column at the start of the unpinned columns. */
+function pin(id: string, pinned: boolean): void {
+  if (!grid) return;
+  const column = grid.table.getColumn(id);
+  if (pinned) column?.pin('start');
+  else {
+    column?.pin(false);
+    grid.table.setColumnOrder([id, ...fullOrder(grid).filter((each) => each !== id)]);
+  }
+  rebuildTable();
+}
+
+function selectColumn(column: number): void {
+  const [row] = grid?.viewRows ?? [];
+  if (!grid || row === undefined) return;
+  grid.selection = {rows: new Set(grid.viewRows), columns: new Set([column]), wholeRows: false};
+  grid.focus = {row, column};
+  grid.anchor = grid.focus;
+  paint();
+}
+
+function resetWidths(): void {
+  if (!grid) return;
+  grid.table.setColumnSizing(grid.fitSizing);
+  applyWidths();
+}
+
+const hideItem = (current: Grid, column: number): MenuItem => ({
+  label: 'Hide Column',
+  run: () => hideColumns([String(column)]),
+  disabled: current.viewColumns.length <= 1
+});
+
+const showAllItem = (current: Grid): MenuItem => ({
+  label: 'Show All Columns',
+  run: showAllColumns,
+  disabled: current.viewColumns.length === current.view.columns.length
+});
+
+function copyColumnItem(current: Grid, column: number): MenuItem {
+  const {resultId} = current.view;
+  return {
+    label: 'Copy Column',
+    run: () => host.postMessage({type: 'copyColumn', resultId, column, rows: current.viewRows}),
+    disabled: current.viewRows.length === 0
+  };
+}
+
+function openCellMenu(point: Point, x: number, y: number): void {
+  if (!grid) return;
+  const current = grid;
+  const {resultId} = current.view;
+  const {row, column} = point;
+  const copySelection = (format: 'csv' | 'json' | 'markdown') => () => {
+    const {rows, columns} = selectionCells(
+      current.selection,
+      current.viewRows,
+      current.viewColumns
+    );
+    if (rows.length > 0)
+      host.postMessage({type: 'copySelection', resultId, format, rows, columns, header: true});
+  };
+  openMenu(
+    [
+      {
+        label: 'Copy Value',
+        run: () => host.postMessage({type: 'copyValue', resultId, row, column, pretty: false})
+      },
+      {label: 'Copy Selection as CSV', run: copySelection('csv')},
+      {label: 'Copy Selection as JSON', run: copySelection('json')},
+      {label: 'Copy Selection as Markdown', run: copySelection('markdown')},
+      copyColumnItem(current, column),
+      'separator',
+      hideItem(current, column),
+      showAllItem(current),
+      'separator',
+      {label: 'Record View', run: () => openRecord(row)}
+    ],
+    x,
+    y
+  );
+}
+
+function openHeaderMenu(id: string, x: number, y: number): void {
+  if (!grid) return;
+  const column = Number(id);
+  const {resultId} = grid.view;
+  const pinned = Boolean(grid.table.getColumn(id)?.getIsPinned());
+  const others = grid.viewColumns.filter((each) => each !== column).map(String);
+  openMenu(
+    [
+      {
+        label: 'Copy Column Name',
+        run: () => host.postMessage({type: 'copyColumnName', resultId, column})
+      },
+      copyColumnItem(grid, column),
+      {
+        label: 'Select Column',
+        run: () => selectColumn(column),
+        disabled: grid.viewRows.length === 0
+      },
+      'separator',
+      {label: 'Sort Ascending', run: () => sortBy(id, false)},
+      {label: 'Sort Descending', run: () => sortBy(id, true)},
+      {label: 'Clear Sort', run: () => sortBy(id, undefined)},
+      'separator',
+      pinned
+        ? {label: 'Unpin Column', run: () => pin(id, false)}
+        : {label: 'Pin Column', run: () => pin(id, true)},
+      hideItem(grid, column),
+      {label: 'Hide Other Columns', run: () => hideColumns(others)},
+      showAllItem(grid),
+      {label: 'Reset Column Widths', run: resetWidths}
+    ],
+    x,
+    y
+  );
+}
+
+/** A right-click on an unselected cell selects only that cell; inside the selection, it keeps it. */
+function onContextMenu(event: MouseEvent): void {
+  const target = event.target as Element;
+  const th = target.closest('th[data-column]');
+  const td = target.closest('td[data-column]');
+  if (!grid) return;
+  if (th instanceof HTMLElement) {
+    event.preventDefault();
+    openHeaderMenu(th.dataset.column ?? '', event.clientX, event.clientY);
+  } else if (td instanceof HTMLElement) {
+    event.preventDefault();
+    const point = {row: Number(td.dataset.row), column: Number(td.dataset.column)};
+    const {selection} = grid;
+    if (
+      selection.rows.has(point.row) &&
+      (selection.wholeRows || selection.columns.has(point.column))
+    ) {
+      grid.focus = point;
+      paint();
+    } else selectCell(point, false, false);
+    openCellMenu(point, event.clientX, event.clientY);
+  }
+}
+
+function setColumnFilter(id: string, filter: ValueSet | undefined): void {
+  grid?.table.getColumn(id)?.setFilterValue(filter);
+  closePopup();
+  rebuildTable();
+}
+
+function checkbox(
+  text: string,
+  checked: boolean
+): {box: HTMLInputElement; label: HTMLLabelElement} {
+  const box = element('input');
+  box.type = 'checkbox';
+  box.checked = checked;
+  const label = element('label');
+  label.append(box, text);
+  return {box, label};
+}
+
+/**
+ * The `(empty)` entry has no `value`: it stands for the `missing` and `null` cells, so a string
+ * cell that reads `(empty)` is a value of its own.
+ */
+interface FilterEntry {
+  box: HTMLInputElement;
+  label: HTMLLabelElement;
+  text: string;
+  value?: string;
+}
+
+function openFilter(id: string, x: number, y: number): void {
+  const column = grid?.table.getColumn(id);
+  if (!grid || !column) return;
+  const index = Number(id);
+  const {empty, values} = distinctValues(grid.view.cells.map((row) => row[index] ?? MISSING));
+  const current = column.getFilterValue() as ValueSet | undefined;
+  const entries: FilterEntry[] = [];
+  if (empty) entries.push({...checkbox('(empty)', current?.empty ?? true), text: '(empty)'});
+  for (const value of values)
+    entries.push({...checkbox(value, current?.values.has(value) ?? true), text: value, value});
+
+  const shown = () => entries.filter((entry) => !entry.label.hidden);
+  const all = checkbox('Select All', false);
+  const syncAll = () => {
+    all.box.checked = shown().length > 0 && shown().every((entry) => entry.box.checked);
+  };
+  all.box.addEventListener('change', () => {
+    for (const entry of shown()) entry.box.checked = all.box.checked;
+  });
+  const search = element('input');
+  search.placeholder = 'Search';
+  search.addEventListener('input', () => {
+    for (const entry of entries) entry.label.hidden = !cellMatches(entry.text, search.value);
+    syncAll();
+  });
+  const list = element('div', undefined, 'values');
+  list.append(...entries.map((entry) => entry.label));
+  list.addEventListener('change', syncAll);
+  syncAll();
+
+  const apply = action('Apply', () => {
+    if (entries.every((entry) => entry.box.checked)) setColumnFilter(id, undefined);
+    else
+      setColumnFilter(id, {
+        empty: entries.some((entry) => entry.value === undefined && entry.box.checked),
+        values: new Set(
+          entries.flatMap((entry) =>
+            entry.value !== undefined && entry.box.checked ? [entry.value] : []
+          )
+        )
+      });
+  });
+  const actions = element('div', undefined, 'actions');
+  actions.append(
+    apply,
+    action('Clear', () => setColumnFilter(id, undefined))
+  );
+
+  const node = element('div', undefined, 'popup');
+  node.append(search, all.label, list, actions);
+  node.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closePopup();
+  });
+  placePopup(node, x, y);
+  search.focus();
+}
+
+function filterIcon(id: string, filtered: boolean): HTMLElement {
+  const icon = element('span', '▿', filtered ? 'filter active' : 'filter');
+  icon.title = 'Filter';
+  icon.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const {left, bottom} = icon.getBoundingClientRect();
+    openFilter(id, left, bottom);
+  });
+  return icon;
 }
 
 function renderResult(bar: HTMLElement, view: ResultView): void {
@@ -616,6 +1049,12 @@ function renderResult(bar: HTMLElement, view: ResultView): void {
     startDrag(event);
   });
   box.addEventListener('click', onGridClick);
+  box.addEventListener('dblclick', (event) => {
+    const td = (event.target as Element).closest('td[data-column]');
+    if (td instanceof HTMLElement)
+      openViewer({row: Number(td.dataset.row), column: Number(td.dataset.column)});
+  });
+  box.addEventListener('contextmenu', onContextMenu);
   box.addEventListener('keydown', onGridKey);
   scrollBox = box;
   totalsLine = element('div', undefined, 'totals');
@@ -633,6 +1072,7 @@ function render(view: View): void {
   const resultId = view.kind === 'result' ? view.resultId : undefined;
   if (resultId !== undefined && resultId === shownResultId) return;
   shownResultId = resultId;
+  closeAll();
   const bar = element('div', undefined, 'bar');
   root.replaceChildren(bar);
   scrollBox = undefined;
@@ -713,6 +1153,10 @@ document.addEventListener('mouseup', (event) => {
   const target = th instanceof HTMLElement ? th.dataset.column : undefined;
   if (done.kind === 'reorder' && target !== undefined && target !== done.column)
     reorder(done.column, target);
+});
+
+document.addEventListener('mousedown', (event) => {
+  if (popup && !(event.target instanceof Node && popup.contains(event.target))) closePopup();
 });
 
 window.addEventListener('blur', () => {

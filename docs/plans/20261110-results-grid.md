@@ -643,18 +643,18 @@ scripts outside the repository.
 - Modify: `media/results.ts`, `media/results.test.ts`
 - Modify: `src/results-model.ts` (`STYLE`)
 
-- [ ] the cell menu and the header menu with the exact labels, the disabled states and keyboard
+- [x] the cell menu and the header menu with the exact labels, the disabled states and keyboard
       control; a right-click on an unselected cell selects only that cell, inside the selection keeps it
-- [ ] Hide Column, Hide Other Columns, Show All Columns (TanStack visibility; hiding clears the hidden
+- [x] Hide Column, Hide Other Columns, Show All Columns (TanStack visibility; hiding clears the hidden
       columns' filters), Select Column, Sort Ascending/Descending, Clear Sort, Reset Column Widths, Copy
       Column Name, Copy Column, Pin Column / Unpin Column (TanStack pinning, cumulative CSSOM `left`)
-- [ ] the per-column filter popup (search, Select All, values, `(empty)`, Apply, Clear) as a TanStack
+- [x] the per-column filter popup (search, Select All, values, `(empty)`, Apply, Clear) as a TanStack
       column filter with `inValueSet`, and the highlighted header icon
-- [ ] the value viewer (`<dialog>`, `prettyText`, `jsonTokens` spans, Copy, Close, Esc); double-click and
+- [x] the value viewer (`<dialog>`, `prettyText`, `jsonTokens` spans, Copy, Close, Esc); double-click and
       Shift+Enter in the grid open it
-- [ ] Record View: the `Column | Value` table of the focused row; a double-click on a value opens the
+- [x] Record View: the `Column | Value` table of the focused row; a double-click on a value opens the
       viewer
-- [ ] the wiring test: render with a column named `o.orderId`, sort a column descending, hide one column,
+- [x] the wiring test: render with a column named `o.orderId`, sort a column descending, hide one column,
       reorder two others and pin one, select a 2×2 range and dispatch `copy`; check the posted
       `copySelection`: the ORIGINAL row indices, the column indices in view order (pinned first), `tsv`,
       the `resultId`; then select one cell and check `copyValue` with its original `row` and `column`;
@@ -662,17 +662,17 @@ scripts outside the repository.
       `rows`; then Shift+Enter and the viewer's Copy send `copyValue` with the original `row` and
       `column` and `pretty: true`; then select two rows, sort again, dispatch `copy`: the same original
       rows are posted
-- [ ] jsdom test: right-click an unselected cell and choose Copy Selection as CSV (that one cell, `csv`,
+- [x] jsdom test: right-click an unselected cell and choose Copy Selection as CSV (that one cell, `csv`,
       `header: true`); right-click inside a 2×2 selection and choose it again (both rows, both columns)
-- [ ] jsdom test: a column filter, then Hide Column on that column: the rows come back; Apply with every
+- [x] jsdom test: a column filter, then Hide Column on that column: the rows come back; Apply with every
       value checked removes the filter; with every row filtered out, the header menu's Copy Column is
       disabled; on a one-column result, Hide Column is disabled in the cell menu and in the header menu
-- [ ] security test: a hostile column name and a hostile JSON value render as text in the viewer title,
+- [x] security test: a hostile column name and a hostile JSON value render as text in the viewer title,
       the viewer body, Record View, the column filter list and the JSON cell tooltip (after `mouseover`)
       (no element made from them)
-- [ ] jsdom test: open the viewer and a cell menu on result A, render a new `resultId`: the dialog is
+- [x] jsdom test: open the viewer and a cell menu on result A, render a new `resultId`: the dialog is
       closed and no menu is in the DOM
-- [ ] run `pnpm typecheck`, `pnpm test` and `pnpm build` - must pass before task 10
+- [x] run `pnpm typecheck`, `pnpm test` and `pnpm build` - must pass before task 10
 
 ### Task 10: Update documentation
 

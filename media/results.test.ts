@@ -72,12 +72,47 @@ const findField = () => document.querySelector('input.find') as HTMLInputElement
 const headerNames = () =>
   [...document.querySelectorAll('th[data-column] .name')].map((node) => node.textContent);
 
+const contextMenu = (target: Element) => mouse(target, 'contextmenu', {clientX: 5, clientY: 5});
+const menuItem = (label: string) =>
+  [...document.querySelectorAll<HTMLElement>('.menu [role="menuitem"]')].find(
+    (node) => node.textContent === label
+  ) as HTMLElement;
+const choose = (target: Element, label: string) => {
+  contextMenu(target);
+  menuItem(label).click();
+};
+const disabled = (label: string) => menuItem(label).getAttribute('aria-disabled') === 'true';
+const rowNumber = (row: number) =>
+  document.querySelector(`tr[data-row="${row}"] td.rownum`) as HTMLElement;
+const dialogButton = (label: string) =>
+  [...document.querySelectorAll<HTMLButtonElement>('dialog button')].find(
+    (node) => node.textContent === label
+  ) as HTMLButtonElement;
+const openFilter = (name: string) =>
+  ((header(name) as HTMLElement).querySelector('.filter') as HTMLElement).click();
+const filterOption = (label: string) =>
+  [...document.querySelectorAll('.popup label')]
+    .find((node) => node.textContent === label)
+    ?.querySelector('input') as HTMLInputElement;
+const popupButton = (label: string) =>
+  [...document.querySelectorAll<HTMLButtonElement>('.popup button')].find(
+    (node) => node.textContent === label
+  ) as HTMLButtonElement;
+
 beforeAll(async () => {
   Object.assign(globalThis, {
     acquireVsCodeApi: () => ({postMessage: (message: PanelMessage) => posted.push(message)})
   });
-  // jsdom has no layout, so no scrollIntoView.
+  // jsdom has no layout, so no scrollIntoView, and no modal dialogs.
   Element.prototype.scrollIntoView = () => {};
+  HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
+    this.open = true;
+  };
+  HTMLDialogElement.prototype.close = function (this: HTMLDialogElement) {
+    if (!this.open) return;
+    this.open = false;
+    this.dispatchEvent(new Event('close'));
+  };
   document.body.innerHTML = '<div id="root"></div>';
   await import('./results');
 });
@@ -216,6 +251,200 @@ describe('results webview', () => {
     expect(line.textContent).toBe('Count 2 · Sum 40 · Avg 20 · Min 10 · Max 30');
     mouse(cell(0, 2), 'click');
     expect(line.hidden).toBe(true);
+  });
+
+  // Every copy names original rows and column indices in view order. A copy that sent view
+  // positions, or columns in definition order, would copy other cells than the ones shown.
+  it('copies the shown cells by original row and column through sort, hide, reorder and pin', () => {
+    render({
+      kind: 'result',
+      resultId: 'wiring',
+      summary: '3 rows',
+      columns: ['o.orderId', 'name', 'amount', 'note'],
+      cells: [
+        [text('A1'), text('Ann'), number(30), text('x')],
+        [text('B2'), text('Bob'), number(10), text('y')],
+        [text('C3'), text('Cy'), number(20), {text: '{"k":1}', kind: 'json'}]
+      ]
+    });
+    header('amount')?.click();
+    header('amount')?.click();
+    choose(header('note') as Element, 'Hide Column');
+    mouse(header('name') as Element, 'mousedown', {clientX: 10, buttons: 1});
+    mouse(document, 'mousemove', {clientX: 200, buttons: 1});
+    mouse(header('o.orderId') as Element, 'mouseup', {clientX: 200});
+    choose(header('amount') as Element, 'Pin Column');
+    expect(headerNames()).toEqual(['amount', 'name', 'o.orderId']);
+
+    mouse(cell(0, 2), 'click');
+    mouse(cell(2, 1), 'click', {shiftKey: true});
+    scrollBox().focus();
+    copy();
+    expect(posted.at(-1)).toEqual({
+      type: 'copySelection',
+      resultId: 'wiring',
+      format: 'tsv',
+      rows: [0, 2],
+      columns: [2, 1],
+      header: false
+    });
+
+    mouse(cell(1, 0), 'click');
+    copy();
+    expect(posted.at(-1)).toEqual({
+      type: 'copyValue',
+      resultId: 'wiring',
+      row: 1,
+      column: 0,
+      pretty: false
+    });
+
+    choose(header('o.orderId') as Element, 'Copy Column');
+    expect(posted.at(-1)).toEqual({
+      type: 'copyColumn',
+      resultId: 'wiring',
+      column: 0,
+      rows: [0, 2, 1]
+    });
+    choose(header('o.orderId') as Element, 'Copy Column Name');
+    expect(posted.at(-1)).toEqual({type: 'copyColumnName', resultId: 'wiring', column: 0});
+
+    keydown(scrollBox(), {key: 'Enter', shiftKey: true});
+    dialogButton('Copy').click();
+    expect(posted.at(-1)).toEqual({
+      type: 'copyValue',
+      resultId: 'wiring',
+      row: 1,
+      column: 0,
+      pretty: true
+    });
+    dialogButton('Close').click();
+
+    mouse(rowNumber(0), 'click');
+    mouse(rowNumber(2), 'click', {shiftKey: true});
+    header('amount')?.click();
+    scrollBox().focus();
+    copy();
+    expect(posted.at(-1)).toEqual({
+      type: 'copySelection',
+      resultId: 'wiring',
+      format: 'tsv',
+      rows: [0, 2],
+      columns: [2, 1, 0],
+      header: false
+    });
+  });
+
+  // A right-click that kept an old selection elsewhere would copy cells the user did not point at;
+  // one that dropped the selection would make the menu copy one cell only.
+  it('copies the right-clicked cell, or the selection that holds it, from the cell menu', () => {
+    render(people('menu-copy'));
+    choose(cell(1, 0), 'Copy Selection as CSV');
+    expect(posted.at(-1)).toEqual({
+      type: 'copySelection',
+      resultId: 'menu-copy',
+      format: 'csv',
+      rows: [1],
+      columns: [0],
+      header: true
+    });
+
+    mouse(cell(0, 0), 'click');
+    mouse(cell(1, 1), 'click', {shiftKey: true});
+    contextMenu(cell(1, 1));
+    const menu = document.querySelector('.menu') as HTMLElement;
+    keydown(menu, {key: 'ArrowDown'});
+    keydown(menu, {key: 'ArrowDown'});
+    keydown(menu, {key: 'Enter'});
+    expect(posted.at(-1)).toEqual({
+      type: 'copySelection',
+      resultId: 'menu-copy',
+      format: 'csv',
+      rows: [0, 1],
+      columns: [0, 1],
+      header: true
+    });
+    expect(document.querySelector('.menu')).toBeNull();
+  });
+
+  // A filter left on a hidden column hides rows for a reason the user cannot see.
+  it('clears a hidden column filter and disables the menu items that have nothing to act on', () => {
+    render(people('column-filter'));
+    openFilter('name');
+    filterOption('Bob').click();
+    popupButton('Apply').click();
+    expect(columnTexts(0)).toEqual(['Ann', 'Cy']);
+    choose(header('name') as Element, 'Hide Column');
+    expect(columnTexts(2)).toEqual(['30', '10', '20']);
+
+    openFilter('amount');
+    filterOption('10').click();
+    popupButton('Apply').click();
+    expect(columnTexts(2)).toEqual(['30', '20']);
+    openFilter('amount');
+    filterOption('Select All').click();
+    popupButton('Apply').click();
+    expect(columnTexts(2)).toEqual(['30', '10', '20']);
+    expect(header('amount')?.querySelector('.filter')?.classList.contains('active')).toBe(false);
+
+    openFilter('amount');
+    filterOption('Select All').click();
+    popupButton('Apply').click();
+    expect(columnTexts(2)).toEqual([]);
+    contextMenu(header('amount') as Element);
+    expect(disabled('Copy Column')).toBe(true);
+
+    render(amounts('one-column'));
+    contextMenu(cell(0, 0));
+    expect(disabled('Hide Column')).toBe(true);
+    contextMenu(header('amount') as Element);
+    expect(disabled('Hide Column')).toBe(true);
+  });
+
+  it('renders a hostile column name and JSON value as text in every popup', () => {
+    // No quotes, so the JSON text holds the markup as it is.
+    const hostile = '<img src=x onerror=alert(1)>';
+    const json = '{"x":"<img src=x onerror=alert(1)>"}';
+    render({
+      kind: 'result',
+      resultId: 'hostile-popups',
+      summary: '1 row',
+      columns: [hostile],
+      cells: [[{text: json, kind: 'json'}]]
+    });
+    mouse(cell(0, 0), 'mouseover');
+    expect(cell(0, 0).title).toContain(hostile);
+
+    mouse(cell(0, 0), 'dblclick');
+    const viewer = document.querySelector('dialog') as HTMLDialogElement;
+    expect(viewer.querySelector('.title')?.textContent).toBe(`${hostile} · row 1`);
+    expect(viewer.querySelector('pre')?.textContent).toContain(hostile);
+    dialogButton('Close').click();
+
+    openFilter(hostile);
+    expect(filterOption(json)).toBeDefined();
+    keydown(document.querySelector('.popup') as Element, {key: 'Escape'});
+
+    choose(cell(0, 0), 'Record View');
+    const record = [...document.querySelectorAll('dialog table.record td')].map(
+      (td) => td.textContent
+    );
+    expect(record).toEqual([hostile, json]);
+    expect(document.querySelectorAll('img')).toHaveLength(0);
+  });
+
+  // An action in a popup left open on old content would act on the new result.
+  it('closes the dialog and the menu when a new result renders', () => {
+    render(people('popups-a'));
+    mouse(cell(0, 0), 'dblclick');
+    const viewer = document.querySelector('dialog') as HTMLDialogElement;
+    contextMenu(cell(1, 0));
+    expect(viewer.open).toBe(true);
+    expect(document.querySelector('.menu')).not.toBeNull();
+    render(people('popups-b'));
+    expect(viewer.open).toBe(false);
+    expect(viewer.isConnected).toBe(false);
+    expect(document.querySelector('.menu')).toBeNull();
   });
 
   // The host acts only on the run the cancel names.
