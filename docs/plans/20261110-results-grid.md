@@ -315,7 +315,7 @@ again.` in the status bar.
   (JetBrains: decimal): `exactSum` parses each number's `String(n)` (exponent forms too) into a
   `BigInt` mantissa and a decimal scale and adds them exactly, so the order does not matter; Sum prints
   as `String(Number(exactSum))`. Avg = `Number(exactSum) / n` in double arithmetic, where `n` is the
-  number of `number` cells (⚠️ asked JetBrains to confirm the division; its sample fits). A tagged
+  number of `number` cells (JetBrains confirmed). A tagged
   `{"N":…}` is left out. No `number` cell means no line. Numbers print as `String(n)` does. JetBrains live
   reference: `Count 46 · Sum 11519.75 · Avg 250.42934782608697 · Min 15.97 · Max 484.6`.
 - **Pin Column** (user decision, 2026-11-10, both plugins): the header menu's **Pin Column** pins the
@@ -688,12 +688,13 @@ scripts outside the repository.
 
 ### Task 11: Verify acceptance criteria
 
-- [ ] check each item in "Grid behaviour", "Copy formats" and "Export" against the code; resolve every ⚠️
+- [x] check each item in "Grid behaviour", "Copy formats" and "Export" against the code; resolve every ⚠️
       from the JetBrains answers or record it as open
-- [ ] check the size of `dist/results.js` after `node esbuild.mjs --production` (the shipped, minified
-      build) and write it in the PR description
-- [ ] check that `renderHtml`'s CSP is unchanged and that no code calls `setAttribute('style'`
-- [ ] run `pnpm gate`: typecheck, lint, unit, integration, CLI build and binary tests, package; no test
+- [x] check the size of `dist/results.js` after `node esbuild.mjs --production` (the shipped, minified
+      build) and write it in the PR description: 74,496 bytes, 21,928 bytes gzipped (1,212 and 637 at
+      `8d37dcd`)
+- [x] check that `renderHtml`'s CSP is unchanged and that no code calls `setAttribute('style'`
+- [x] run `pnpm gate`: typecheck, lint, unit, integration, CLI build and binary tests, package; no test
       skipped
 
 ## Post-Completion
