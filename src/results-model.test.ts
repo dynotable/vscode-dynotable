@@ -3,7 +3,6 @@ import type {RunResult} from './protocol';
 import {
   columnText,
   copyText,
-  delimitedText,
   formatText,
   jsonText,
   parseMessage,
@@ -30,7 +29,7 @@ const result = (overrides: Partial<RunResult>): RunResult => ({
 
 /** The CSV of a one-column result holding `cell`. */
 const csvOf = (cell: unknown) =>
-  delimitedText(result({columns: ['v'], rows: [{v: cell}]}), [0], [0], true, ',', true);
+  formatText(result({columns: ['v'], rows: [{v: cell}]}), [0], [0], 'csv', true);
 
 describe('summary', () => {
   // The server's cap, not the 500 default; an absent itemsScanned leaves no trace.
@@ -99,7 +98,7 @@ describe('CSV', () => {
 
   it('guards a header cell, and guards before it quotes', () => {
     const guarded = result({columns: ['=HYPERLINK("x")', 'b'], rows: [{b: '=1,2'}]});
-    expect(delimitedText(guarded, [0], [0, 1], true, ',', true)).toBe(
+    expect(formatText(guarded, [0], [0, 1], 'csv', true)).toBe(
       `"'=HYPERLINK(""x"")",b\r\n,"'=1,2"`
     );
   });
@@ -289,10 +288,9 @@ describe('copyText', () => {
     ]
   });
 
-  // A copy for an earlier result, or past the end of this one, must copy nothing.
-  it('copies nothing for an old result id or an index out of range', () => {
+  // A copy past the end of the result must fail loud, not copy part of it.
+  it('throws for an index out of range', () => {
     const cases: CopyMessage[] = [
-      {type: 'copyColumnName', resultId: 'old', column: 0},
       {type: 'copyValue', resultId: 'r1', row: 2, column: 0, pretty: false},
       {type: 'copyColumnName', resultId: 'r1', column: 3},
       {
@@ -305,41 +303,41 @@ describe('copyText', () => {
       },
       {type: 'copyColumn', resultId: 'r1', column: 0, rows: [2]}
     ];
-    for (const message of cases) expect(copyText(orders, 'r1', message)).toBeUndefined();
+    for (const message of cases) expect(() => copyText(orders, message)).toThrow(RangeError);
   });
 
   // Copy CSV of an empty result still gives its columns.
   it('copies the header of a result with columns and no rows', () => {
     expect(
-      copyText(result({columns: ['a', 'b']}), 'r1', {type: 'copy', resultId: 'r1', format: 'csv'})
+      copyText(result({columns: ['a', 'b']}), {type: 'copy', resultId: 'r1', format: 'csv'})
     ).toEqual({text: 'a,b', status: 'Copied 0 rows as CSV.'});
   });
 
   // The count is the size of the copy, not the result's returned rows; `$(` would show an icon.
   it('counts the copied rows and values, and escapes icon syntax in a column name', () => {
     expect(
-      copyText(orders, 'r1', {
+      copyText(orders, {
         type: 'copySelection',
         resultId: 'r1',
         format: 'csv',
         rows: [1],
         columns: [0],
         header: true
-      })?.status
+      }).status
     ).toBe('Copied 1 row as CSV.');
     expect(
-      copyText(orders, 'r1', {
+      copyText(orders, {
         type: 'copySelection',
         resultId: 'r1',
         format: 'markdown',
         rows: [0, 1],
         columns: [0],
         header: true
-      })?.status
+      }).status
     ).toBe('Copied 2 rows as Markdown.');
-    expect(
-      copyText(orders, 'r1', {type: 'copyColumn', resultId: 'r1', column: 1, rows: [1, 0]})
-    ).toEqual({text: 'b\na', status: 'Copied 2 values of \\$(alert).'});
+    expect(copyText(orders, {type: 'copyColumn', resultId: 'r1', column: 1, rows: [1, 0]})).toEqual(
+      {text: 'b\na', status: 'Copied 2 values of \\$(alert).'}
+    );
   });
 
   // Export's own message: one saved row reads as singular, and a file name never shows an icon.
@@ -349,7 +347,7 @@ describe('copyText', () => {
   });
 
   const jsonValue = (pretty: boolean) =>
-    copyText(orders, 'r1', {type: 'copyValue', resultId: 'r1', row: 0, column: 2, pretty})?.text;
+    copyText(orders, {type: 'copyValue', resultId: 'r1', row: 0, column: 2, pretty}).text;
 
   // The viewer copies the indented form; the grid copies the value as the cell shows it.
   it('copies a JSON value indented only when pretty is set', () => {

@@ -6,6 +6,7 @@ import {is, runResultSchema, type RunResult} from './protocol';
 import {
   allText,
   copyText,
+  FORMAT_NAMES,
   parseMessage,
   renderHtml,
   resultView,
@@ -15,13 +16,15 @@ import {
   type View
 } from './results-model';
 
-const COPIED_MESSAGE_MS = 3000;
+const STATUS_MESSAGE_MS = 3000;
 
-const EXPORT_FORMATS: Array<vscode.QuickPickItem & {format: CopyFormat; extension: string}> = [
-  {label: 'CSV', format: 'csv', extension: 'csv'},
-  {label: 'JSON', format: 'json', extension: 'json'},
-  {label: 'Markdown', format: 'markdown', extension: 'md'}
-];
+const EXPORT_FORMATS = (
+  [
+    ['csv', 'csv'],
+    ['json', 'json'],
+    ['markdown', 'md']
+  ] satisfies Array<[CopyFormat, string]>
+).map(([format, extension]) => ({label: FORMAT_NAMES[format], format, extension}));
 
 export type RunOutcome =
   | {kind: 'ok'}
@@ -107,13 +110,12 @@ export class ResultsPanel implements vscode.Disposable {
       case 'copyColumnName': {
         const result = this.result;
         if (result?.id !== message.resultId) {
-          vscode.window.setStatusBarMessage('The results changed. Copy again.', COPIED_MESSAGE_MS);
+          vscode.window.setStatusBarMessage('The results changed. Copy again.', STATUS_MESSAGE_MS);
           return;
         }
-        const copy = copyText(result.value, result.id, message);
-        if (!copy) return;
+        const copy = copyText(result.value, message);
         await vscode.env.clipboard.writeText(copy.text);
-        vscode.window.setStatusBarMessage(copy.status, COPIED_MESSAGE_MS);
+        vscode.window.setStatusBarMessage(copy.status, STATUS_MESSAGE_MS);
         return;
       }
       case 'export':
@@ -125,7 +127,7 @@ export class ResultsPanel implements vscode.Disposable {
   private async export(resultId: string): Promise<void> {
     const result = this.result;
     if (result?.id !== resultId) {
-      vscode.window.setStatusBarMessage('The results changed. Export again.', COPIED_MESSAGE_MS);
+      vscode.window.setStatusBarMessage('The results changed. Export again.', STATUS_MESSAGE_MS);
       return;
     }
     const picked = await vscode.window.showQuickPick(EXPORT_FORMATS, {
@@ -147,7 +149,7 @@ export class ResultsPanel implements vscode.Disposable {
     }
     vscode.window.setStatusBarMessage(
       savedStatus(result.value.rows.length, posix.basename(uri.path)),
-      COPIED_MESSAGE_MS
+      STATUS_MESSAGE_MS
     );
   }
 

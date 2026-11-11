@@ -58,7 +58,10 @@ const isCopyFormat = (value: unknown): value is CopyFormat =>
   value === 'csv' || value === 'tsv' || value === 'json' || value === 'markdown';
 
 /** Each case builds a new object, so no extra field reaches the host. */
-function parseCopy(message: Record<string, unknown>, resultId: string): PanelMessage | undefined {
+function parseResultMessage(
+  message: Record<string, unknown>,
+  resultId: string
+): PanelMessage | undefined {
   const {format, rows, columns, header, row, column, pretty} = message;
   switch (message.type) {
     case 'copy':
@@ -97,7 +100,7 @@ export function parseMessage(value: unknown): PanelMessage | undefined {
       return typeof message.runId === 'string' ? {type: 'cancel', runId: message.runId} : undefined;
     default:
       return typeof message.resultId === 'string'
-        ? parseCopy(message, message.resultId)
+        ? parseResultMessage(message, message.resultId)
         : undefined;
   }
 }
@@ -135,7 +138,7 @@ export function resultView(result: RunResult, resultId: string): ResultView {
 const NUMBER = /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/;
 const FORMULA_START = /^[=+\-@\t\r\n]/;
 
-/** The callers check the indices, so a bad one here is a bug. */
+/** The parser checks that an index is a whole number, not that it is in range: a bad one throws. */
 function at<T>(items: T[], index: number): T {
   const item = items[index];
   if (item === undefined) throw new RangeError(`No item at index ${index}.`);
@@ -157,7 +160,7 @@ function valueText(row: Record<string, unknown>, column: string): string {
   return cellKind(row, column).text;
 }
 
-export function delimitedText(
+function delimitedText(
   result: RunResult,
   rows: number[],
   columns: number[],
@@ -246,7 +249,7 @@ export function toJson(result: RunResult): string {
   return JSON.stringify(result.rows, null, 2);
 }
 
-const FORMAT_NAMES: Record<CopyFormat, string> = {
+export const FORMAT_NAMES: Record<CopyFormat, string> = {
   csv: 'CSV',
   tsv: 'TSV',
   json: 'JSON',
@@ -262,18 +265,8 @@ export function savedStatus(rows: number, fileName: string): string {
   return `Saved ${plural(rows, 'row', 'rows')} to ${statusName(fileName)}.`;
 }
 
-/**
- * The text and the status bar message of a copy. `undefined` when `resultId` is not the current
- * result's id, or when an index is out of range.
- */
-export function copyText(
-  result: RunResult,
-  resultId: string,
-  message: CopyMessage
-): {text: string; status: string} | undefined {
-  if (message.resultId !== resultId) return undefined;
-  const inRows = (row: number) => row < result.rows.length;
-  const inColumns = (column: number) => column < result.columns.length;
+/** The text and the status bar message of a copy. An index out of range throws a `RangeError`. */
+export function copyText(result: RunResult, message: CopyMessage): {text: string; status: string} {
   switch (message.type) {
     case 'copy':
       return {
@@ -282,7 +275,6 @@ export function copyText(
       };
     case 'copySelection': {
       const {rows, columns, format, header} = message;
-      if (!rows.every(inRows) || !columns.every(inColumns)) return undefined;
       return {
         text: formatText(result, rows, columns, format, header),
         status: `Copied ${plural(rows.length, 'row', 'rows')} as ${FORMAT_NAMES[format]}.`
@@ -290,7 +282,6 @@ export function copyText(
     }
     case 'copyValue': {
       const {row, column, pretty} = message;
-      if (!inRows(row) || !inColumns(column)) return undefined;
       const cell = cellKind(at(result.rows, row), at(result.columns, column));
       return {
         text: pretty ? prettyText(cell.text, cell.kind) : cell.text,
@@ -299,14 +290,12 @@ export function copyText(
     }
     case 'copyColumn': {
       const {column, rows} = message;
-      if (!inColumns(column) || !rows.every(inRows)) return undefined;
       return {
         text: columnText(result, column, rows),
         status: `Copied ${plural(rows.length, 'value', 'values')} of ${statusName(at(result.columns, column))}.`
       };
     }
     case 'copyColumnName':
-      if (!inColumns(message.column)) return undefined;
       return {text: at(result.columns, message.column), status: 'Copied the column name.'};
   }
 }
