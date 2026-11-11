@@ -11,3 +11,7 @@
   ESM-only and needs Node.js 20.19.
 - Keep `vscode-languageclient` at an exact version, with one `vscode-jsonrpc` in the tree. The
   client tells errors apart with `instanceof ResponseError`.
+- Keep `@tanstack/table-core` at an exact version. Before an upgrade, check three behaviours that
+  `media/results.ts` depends on: pinned columns come first, in `columnPinning.start` order; a
+  visibility change does not re-run the global filter; the view column order comes from
+  `getHeaderGroups()`, not from `getVisibleLeafColumns()`.
