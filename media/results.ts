@@ -1075,7 +1075,9 @@ function filterIcon(id: string, filtered: boolean): HTMLElement {
 
 function renderResult(bar: HTMLElement, view: ResultView): void {
   if (grid?.view.resultId !== view.resultId) grid = createGrid(view);
-  bar.append(element('span', view.summary, 'summary'));
+  const summary = element('span', view.summary, 'summary');
+  summary.title = view.summary;
+  bar.append(summary);
   if (view.columns.length > 0) bar.append(...findControls(grid.query));
   bar.append(
     button('Copy CSV', {type: 'copy', resultId: view.resultId, format: 'csv'}),
