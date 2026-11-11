@@ -486,24 +486,24 @@ scripts outside the repository.
 - Modify: `src/results-model.ts`, `src/results-model.test.ts`
 - Modify: `src/results.ts`
 
-- [ ] give `csvField` a delimiter and a guard flag; add `delimitedText`, `jsonText` (written by hand),
+- [x] give `csvField` a delimiter and a guard flag; add `delimitedText`, `jsonText` (written by hand),
       `markdownTable`, `valueText`, `columnText` and `formatText`; delete `toCsv` and point the CSV `copy`
       case in `src/results.ts` at `formatText` with all rows and columns; keep `toJson` for the toolbar's
       Copy JSON
-- [ ] point the existing CSV guard and bypass tests at `delimitedText` (through `csvOf`, and the header
+- [x] point the existing CSV guard and bypass tests at `delimitedText` (through `csvOf`, and the header
       case at :106); keep every case and the `toJson` tagged-`N` case at :87
-- [ ] test `formatText`: `csv` on `=1+1` gives `'=1+1`; TSV quotes a tab, not a comma, and `=1+1` with
+- [x] test `formatText`: `csv` on `=1+1` gives `'=1+1`; TSV quotes a tab, not a comma, and `=1+1` with
       `{"qty":1}` gives exactly `=1+1\t"{""qty"":1}"` (no guard); two CSV rows have one CRLF between them
       and none at the end; Markdown joins with LF
-- [ ] test JSON: a row from `JSON.parse('{"b":1,"2024":2,"__proto__":3,"a\\"b\\\\c":4}')` with the
+- [x] test JSON: a row from `JSON.parse('{"b":1,"2024":2,"__proto__":3,"a\\"b\\\\c":4}')` with the
       columns `constructor`, `b`, `2024`, `__proto__`, `a"b\c` and a last column `toString` gives the exact literal text
       (keys in that order, `constructor` and `toString` left out, no stray comma), and `JSON.parse` accepts it; a row with
       none of the columns gives `{}`; no rows gives `[]`; a tagged `N` stays exact; a nested object is
       indented at its depth
-- [ ] test Markdown: `a\|b` becomes `a\\\|b`; CRLF, CR and LF each become one space
-- [ ] test `valueText` and `columnText`: a string is not JSON-quoted; a `toString` column the row lacks
+- [x] test Markdown: `a\|b` becomes `a\\\|b`; CRLF, CR and LF each become one space
+- [x] test `valueText` and `columnText`: a string is not JSON-quoted; a `toString` column the row lacks
       gives `''`; the column text has no header, joins with `\n` and has no guard
-- [ ] run `pnpm typecheck`, `pnpm test` and `pnpm test:integration` - must pass before task 5
+- [x] run `pnpm typecheck`, `pnpm test` and `pnpm test:integration` - must pass before task 5
 
 ### Task 5: Change the view model, the messages and their callers together
 

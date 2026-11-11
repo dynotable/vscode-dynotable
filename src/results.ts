@@ -2,10 +2,10 @@ import {randomUUID} from 'node:crypto';
 import * as vscode from 'vscode';
 import {is, runResultSchema, type RunResult} from './protocol';
 import {
+  formatText,
   parseMessage,
   renderHtml,
   resultView,
-  toCsv,
   toJson,
   type RenderMessage,
   type View
@@ -87,7 +87,16 @@ export class ResultsPanel implements vscode.Disposable {
         return;
       case 'copy': {
         if (!this.result) return;
-        const text = message.format === 'csv' ? toCsv(this.result) : toJson(this.result);
+        const text =
+          message.format === 'csv'
+            ? formatText(
+                this.result,
+                [...this.result.rows.keys()],
+                [...this.result.columns.keys()],
+                'csv',
+                true
+              )
+            : toJson(this.result);
         await vscode.env.clipboard.writeText(text);
         vscode.window.setStatusBarMessage(
           `Copied ${this.result.returnedRows} rows as ${message.format.toUpperCase()}.`,

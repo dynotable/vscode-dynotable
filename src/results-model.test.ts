@@ -1,6 +1,16 @@
 import {describe, expect, it} from 'vitest';
 import type {RunResult} from './protocol';
-import {parseMessage, renderHtml, resultView, summary, toCsv, toJson} from './results-model';
+import {
+  columnText,
+  delimitedText,
+  formatText,
+  jsonText,
+  parseMessage,
+  renderHtml,
+  resultView,
+  summary,
+  toJson
+} from './results-model';
 
 const result = (overrides: Partial<RunResult>): RunResult => ({
   columns: [],
@@ -16,7 +26,8 @@ const result = (overrides: Partial<RunResult>): RunResult => ({
 });
 
 /** The CSV of a one-column result holding `cell`. */
-const csvOf = (cell: unknown) => toCsv(result({columns: ['v'], rows: [{v: cell}]}));
+const csvOf = (cell: unknown) =>
+  delimitedText(result({columns: ['v'], rows: [{v: cell}]}), [0], [0], true, ',', true);
 
 describe('summary', () => {
   // The server's cap, not the 500 default; an absent itemsScanned leaves no trace.
@@ -103,7 +114,8 @@ describe('CSV', () => {
   });
 
   it('guards a header cell, and guards before it quotes', () => {
-    expect(toCsv(result({columns: ['=HYPERLINK("x")', 'b'], rows: [{b: '=1,2'}]}))).toBe(
+    const guarded = result({columns: ['=HYPERLINK("x")', 'b'], rows: [{b: '=1,2'}]});
+    expect(delimitedText(guarded, [0], [0, 1], true, ',', true)).toBe(
       `"'=HYPERLINK(""x"")",b\r\n,"'=1,2"`
     );
   });
@@ -120,6 +132,81 @@ describe('CSV', () => {
 
   it.each(['-12345678901.5', '-1e5'])('leaves the number literal %j intact', (cell) => {
     expect(csvOf(cell)).toBe(`v\r\n${cell}`);
+  });
+});
+
+describe('copy formats', () => {
+  const mixed = result({
+    columns: ['a', 'b'],
+    rows: [
+      {a: '=1+1', b: {qty: 1}},
+      {a: 'x,y', b: 'p\tq'}
+    ]
+  });
+
+  // CSV must keep the guard; TSV (a paste into a grid) must not, and each quotes its own delimiter
+  // only. A trailing CRLF would paste an empty last row.
+  it('maps CSV and TSV to their delimiter and guard', () => {
+    expect(formatText(mixed, [0, 1], [0, 1], 'csv', false)).toBe(
+      `'=1+1,"{""qty"":1}"\r\n"x,y",p\tq`
+    );
+    expect(formatText(mixed, [0, 1], [0, 1], 'tsv', false)).toBe(
+      `=1+1\t"{""qty"":1}"\r\nx,y\t"p\tq"`
+    );
+  });
+
+  // An unescaped pipe splits a cell, and a line break ends the table row.
+  it('escapes Markdown cells and joins the lines with LF', () => {
+    const text = result({columns: ['v'], rows: [{v: 'a\\|b'}, {v: '1\r\n2\r3\n4'}]});
+    expect(formatText(text, [0, 1], [0], 'markdown', true)).toBe(
+      '| v |\n| --- |\n| a\\\\\\|b |\n| 1 2 3 4 |'
+    );
+  });
+
+  // A JavaScript object would put "2024" first and drop "__proto__"; an inherited name would add
+  // a key; a lossy number would lose the tagged digits.
+  it('writes JSON keys in column order, with only own keys, at the depth of each value', () => {
+    const hostile = result({
+      columns: ['constructor', 'b', '2024', '__proto__', 'a"b\\c', 'toString'],
+      rows: [
+        JSON.parse('{"b":1,"2024":2,"__proto__":3,"a\\"b\\\\c":4}') as Record<string, unknown>,
+        {},
+        {b: {N: '12345678901234567890.123'}, '2024': {x: [1]}}
+      ]
+    });
+    const text = jsonText(hostile, [0, 1, 2], [0, 1, 2, 3, 4, 5]);
+    expect(text).toBe(
+      [
+        '[',
+        '  {',
+        '    "b": 1,',
+        '    "2024": 2,',
+        '    "__proto__": 3,',
+        '    "a\\"b\\\\c": 4',
+        '  },',
+        '  {},',
+        '  {',
+        '    "b": {',
+        '      "N": "12345678901234567890.123"',
+        '    },',
+        '    "2024": {',
+        '      "x": [',
+        '        1',
+        '      ]',
+        '    }',
+        '  }',
+        ']'
+      ].join('\n')
+    );
+    expect(() => JSON.parse(text) as unknown).not.toThrow();
+    expect(jsonText(hostile, [], [1])).toBe('[]');
+  });
+
+  // Column text is for a paste as plain text: a header, quotes or a guard would change the values.
+  it('gives the column values with no header, quotes or guard, joined by LF', () => {
+    const column = result({columns: ['v', 'toString'], rows: [{v: '=a'}, {v: 'b c'}]});
+    expect(columnText(column, 0, [1, 0])).toBe('b c\n=a');
+    expect(columnText(column, 1, [0])).toBe('');
   });
 });
 

@@ -79,15 +79,108 @@ export function resultView(result: RunResult): ResultView {
 const NUMBER = /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/;
 const FORMULA_START = /^[=+\-@\t\r\n]/;
 
-/** A spreadsheet runs a cell that starts with a formula character, unless it is a plain number. */
-function csvField(text: string): string {
-  const guarded = FORMULA_START.test(text) && !NUMBER.test(text) ? `'${text}` : text;
-  return /[",\r\n]/.test(guarded) ? `"${guarded.replaceAll('"', '""')}"` : guarded;
+export type CopyFormat = 'csv' | 'tsv' | 'json' | 'markdown';
+
+/** The callers check the indices, so a bad one here is a bug. */
+function at<T>(items: T[], index: number): T {
+  const item = items[index];
+  if (item === undefined) throw new RangeError(`No item at index ${index}.`);
+  return item;
 }
 
-export function toCsv(result: RunResult): string {
-  const lines = [result.columns, ...resultView(result).cells];
-  return lines.map((line) => line.map(csvField).join(',')).join('\r\n');
+/**
+ * With `guard`, a spreadsheet would run a cell that starts with a formula character, unless it is a
+ * plain number. The guard comes before the quoting.
+ */
+function csvField(text: string, delimiter: string, guard: boolean): string {
+  const guarded = guard && FORMULA_START.test(text) && !NUMBER.test(text) ? `'${text}` : text;
+  return guarded.includes(delimiter) || /["\r\n]/.test(guarded)
+    ? `"${guarded.replaceAll('"', '""')}"`
+    : guarded;
+}
+
+export function valueText(row: Record<string, unknown>, column: string): string {
+  return cellKind(row, column).text;
+}
+
+export function delimitedText(
+  result: RunResult,
+  rows: number[],
+  columns: number[],
+  header: boolean,
+  delimiter: string,
+  guard: boolean
+): string {
+  const names = columns.map((column) => at(result.columns, column));
+  const lines = rows.map((row) => names.map((name) => valueText(at(result.rows, row), name)));
+  if (header) lines.unshift(names);
+  return lines
+    .map((line) => line.map((text) => csvField(text, delimiter, guard)).join(delimiter))
+    .join('\r\n');
+}
+
+/**
+ * The bytes of `JSON.stringify(objects, null, 2)`, written by hand: a JavaScript object would move
+ * integer-like keys such as `"2024"` first and would lose a `__proto__` key.
+ */
+export function jsonText(result: RunResult, rows: number[], columns: number[]): string {
+  if (rows.length === 0) return '[]';
+  const names = columns.map((column) => at(result.columns, column));
+  const objects = rows.map((index) => {
+    const row = at(result.rows, index);
+    const members = names
+      .filter((name) => Object.hasOwn(row, name))
+      .map(
+        (name) =>
+          `    ${JSON.stringify(name)}: ${JSON.stringify(row[name], null, 2).replaceAll('\n', '\n    ')}`
+      );
+    return members.length === 0 ? '  {}' : `  {\n${members.join(',\n')}\n  }`;
+  });
+  return `[\n${objects.join(',\n')}\n]`;
+}
+
+function markdownCell(text: string): string {
+  return text
+    .replaceAll('\\', '\\\\')
+    .replaceAll('|', '\\|')
+    .replaceAll(/\r\n|\r|\n/g, ' ');
+}
+
+const markdownLine = (texts: string[]) => `| ${texts.map(markdownCell).join(' | ')} |`;
+
+export function markdownTable(result: RunResult, rows: number[], columns: number[]): string {
+  const names = columns.map((column) => at(result.columns, column));
+  return [
+    markdownLine(names),
+    `| ${names.map(() => '---').join(' | ')} |`,
+    ...rows.map((row) => markdownLine(names.map((name) => valueText(at(result.rows, row), name))))
+  ].join('\n');
+}
+
+/** Plain text, not CSV, so it has no formula guard. */
+export function columnText(result: RunResult, column: number, rows: number[]): string {
+  const name = at(result.columns, column);
+  return rows.map((row) => valueText(at(result.rows, row), name)).join('\n');
+}
+
+/** `header` applies to CSV and TSV only. TSV is for a paste into a grid, so it has no guard. */
+export function formatText(
+  result: RunResult,
+  rows: number[],
+  columns: number[],
+  format: CopyFormat,
+  header: boolean
+): string {
+  switch (format) {
+    case 'csv':
+      return delimitedText(result, rows, columns, header, ',', true);
+    case 'tsv':
+      return delimitedText(result, rows, columns, header, '\t', false);
+    case 'json':
+      return jsonText(result, rows, columns);
+    case 'markdown':
+      return markdownTable(result, rows, columns);
+  }
 }
 
 export function toJson(result: RunResult): string {
