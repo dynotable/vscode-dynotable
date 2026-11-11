@@ -75,7 +75,11 @@
         ],
         "extensions": [
           ".partiql"
-        ]
+        ],
+        "icon": {
+          "light": "./media/file-light.svg",
+          "dark": "./media/file-dark.svg"
+        }
       },
       {
         "id": "opensearch",
@@ -84,7 +88,11 @@
         ],
         "extensions": [
           ".opensearch"
-        ]
+        ],
+        "icon": {
+          "light": "./media/file-light.svg",
+          "dark": "./media/file-dark.svg"
+        }
       }
     ],
     "grammars": [

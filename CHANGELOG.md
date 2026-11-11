@@ -9,6 +9,7 @@
   Double-click a cell to see its full value, or open Record View to see a row.
 - Export saves all rows to a CSV, JSON or Markdown file.
 - The results panel no longer shows the statement that ran.
+- PartiQL (`.partiql`) and OpenSearch (`.opensearch`) files show the DynoTable file icon.
 
 ## 0.2.0 — 2026-11-09
 
