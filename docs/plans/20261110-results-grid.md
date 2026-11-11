@@ -443,25 +443,25 @@ scripts outside the repository.
 - Create: `src/grid-model.ts`, `src/grid-model.test.ts`
 - Modify: `src/results-model.ts`
 
-- [ ] create `src/grid-model.ts` with no Node.js import: `cellKind(row, column)` returning
+- [x] create `src/grid-model.ts` with no Node.js import: `cellKind(row, column)` returning
       `{text, kind}`, `isNumericColumn(cells)`, `compareCells(a, b, numeric)`,
       `cellMatches(text, query)`, `inValueSet(cell, filter)`, `distinctValues(cells)`, `exactSum(numbers)`, `totals(cells)`,
       `fitWidth(headerLength, cellLengths)`
-- [ ] move the literal, own-key read into `cellKind`: `resultView` uses `cellKind(…).text`, and
+- [x] move the literal, own-key read into `cellKind`: `resultView` uses `cellKind(…).text`, and
       `cellText` is deleted
-- [ ] test `cellKind`: one row per kind (the inherited `toString` key is the `missing` row),
+- [x] test `cellKind`: one row per kind (the inherited `toString` key is the `missing` row),
       `{'o.orderId': 'A', o: {orderId: 'B'}}` reads `A` for `o.orderId`, a tagged `N` as `json`, a
       boolean as `string`
-- [ ] test `isNumericColumn` + `compareCells`: a column of `9`, `10` and `null` is numeric and sorts
+- [x] test `isNumericColumn` + `compareCells`: a column of `9`, `10` and `null` is numeric and sorts
       `9` before `10`; a mixed column sorts as text
-- [ ] test `cellMatches`: case-insensitive with `Ä`/`ä`
-- [ ] test `distinctValues` + `inValueSet` in one case: `(empty)` comes first and matches `missing` and
+- [x] test `cellMatches`: case-insensitive with `Ä`/`ä`
+- [x] test `distinctValues` + `inValueSet` in one case: `(empty)` comes first and matches `missing` and
       `null` but not the string `"null"` or `"(empty)"`; the values come in the column's sort order
-- [ ] test `totals`: Count skips `missing` and `null`; Sum/Avg/Min/Max skip the string `"10"` and a
+- [x] test `totals`: Count skips `missing` and `null`; Sum/Avg/Min/Max skip the string `"10"` and a
       tagged `N`;
       `[0.1, 0.2, 0.3]` and `[0.3, 0.2, 0.1]` both give `Sum 0.6` (exact, not `0.6000000000000001`);
       `1e-7` and `0.1` give `Sum 0.1000001`; Avg of `[1, 2]` is `1.5`; no `number` cell gives no totals
-- [ ] run `pnpm typecheck` and `pnpm test` - must pass before task 3
+- [x] run `pnpm typecheck` and `pnpm test` - must pass before task 3
 
 ### Task 3: Add the JSON tokens and the pretty text
 

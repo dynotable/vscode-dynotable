@@ -1,4 +1,5 @@
 import {randomBytes} from 'node:crypto';
+import {cellKind} from './grid-model';
 import type {RunResult} from './protocol';
 
 export interface ResultView {
@@ -65,23 +66,12 @@ export function summary(result: RunResult): string {
   return parts.join(' · ');
 }
 
-/**
- * A column is a literal key, never a path: `o.orderId` is one key. An inherited key such as
- * `toString` is not a value. A string shows as it is. Any other value, a tagged one such as
- * `{"N": …}` or `{"SS": […]}` too, shows as JSON.
- */
-function cellText(row: Record<string, unknown>, column: string): string {
-  if (!Object.hasOwn(row, column)) return '';
-  const value = row[column];
-  return typeof value === 'string' ? value : JSON.stringify(value);
-}
-
 export function resultView(result: RunResult): ResultView {
   return {
     kind: 'result',
     summary: summary(result),
     columns: result.columns,
-    cells: result.rows.map((row) => result.columns.map((column) => cellText(row, column))),
+    cells: result.rows.map((row) => result.columns.map((column) => cellKind(row, column).text)),
     executedStatement: result.executedStatement
   };
 }
