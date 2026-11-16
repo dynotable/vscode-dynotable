@@ -1,6 +1,8 @@
+import type {RunResult} from '../../src/protocol';
 import {visible} from './display';
 import {EXIT, type Sink} from './io';
 import {messageOf, type ErrorCode} from './messages';
+import {renderTable, type TableOptions} from './table';
 
 export interface Failure {
   code: ErrorCode;
@@ -46,18 +48,19 @@ const REPLACED: Partial<Record<ErrorCode, string>> = {
   'launcher-off': 'DynoTable is not running. Start DynoTable.'
 };
 
-const textOf = ({code, detail}: Failure): string =>
-  REPLACED[code] ??
-  detail ??
-  (code === 'usage' ? 'The command line is not valid. See dynotable-lsp --help.' : messageOf(code));
+const textOf = ({code, detail}: Failure): string => REPLACED[code] ?? detail ?? messageOf(code);
 
-/** The plain-text printer of `dynotable-lsp`: a person reads it in a terminal, not a program. */
-export function printText(io: Sink, {value, failure}: Result): void {
-  if (value !== undefined) io.out(`${JSON.stringify(value)}\n`);
-  if (!failure) {
-    io.exit(EXIT.ok);
-    return;
-  }
+/** A failure of `dynotable-lsp` in plain text: a person reads it in a terminal, not a program. */
+export function printText(io: Sink, failure: Failure): void {
   io.err(`${visible(textOf(failure))}\n`);
   io.exit(exitOf(failure.code));
 }
+
+/** `run --zed`: the rows as a table for a person in Zed's terminal panel, a failure as plain text. */
+export const tablePrinter =
+  (options: TableOptions): Printer =>
+  (io, {value, failure}) => {
+    if (value !== undefined) io.out(renderTable(value as RunResult, options));
+    if (failure) printText(io, failure);
+    else io.exit(EXIT.ok);
+  };

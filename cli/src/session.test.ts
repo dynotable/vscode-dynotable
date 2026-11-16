@@ -4,7 +4,7 @@ import {join} from 'node:path';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {listTablesSchema, REQUEST_FAILED, type WireError} from '../../src/protocol';
 import {RpcFailure} from '../../src/rpc';
-import {printText} from './output';
+import {printText, type Printer} from './output';
 import type {SessionOptions} from './session';
 import {useHarness} from './test-session';
 
@@ -18,6 +18,9 @@ beforeEach(() => {
 afterEach(() => {
   for (const server of servers) server.close();
 });
+
+/** `printText` for a failure; the success value of `listTables` is not printed. */
+const plainText: Printer = (io, {failure}) => (failure ? printText(io, failure) : io.exit(0));
 
 /** One `listTables` through a session, as a one-shot command does it. */
 const listTables = (options: Partial<SessionOptions> = {}) =>
@@ -166,7 +169,7 @@ describe('session', () => {
   });
 
   describe('editor session with the text printer (dynotable-lsp run --zed)', () => {
-    const editor = {agent: false, print: printText} as const;
+    const editor = {agent: false, print: plainText} as const;
 
     it('sends no purpose and the dynotable-lsp clientInfo', async () => {
       await h.fake.start();
@@ -177,11 +180,25 @@ describe('session', () => {
       expect(params.clientInfo).toEqual({name: 'dynotable-lsp', version: '0.0.0-dev'});
     });
 
-    // The shared sentence names --no-launch and DYNOTABLE_USER_DATA_DIR, which the Zed task never sets.
+    // The shared sentence names --no-launch and DYNOTABLE_USER_DATA_DIR. The Zed task has no
+    // --no-launch, so this is the path of a DYNOTABLE_USER_DATA_DIR set in the environment.
     it('launcher-off prints its own sentence and exits 1', async () => {
       await listTables(editor);
       expect(h.codes).toEqual([1]);
       expect(h.stderr).toBe('DynoTable is not running. Start DynoTable.\n');
+    });
+
+    // `run --zed` launches the app. With no app found, the shared sentence prints as it is.
+    it('with launching on and no app, prints the not-installed sentence and exits 1', async () => {
+      await listTables({
+        ...editor,
+        launch: true,
+        env: {DYNOTABLE_APP_PATH: join(h.home, 'no-app', 'dynotable')}
+      });
+      expect(h.codes).toEqual([1]);
+      expect(h.stderr).toBe(
+        'DynoTable is not installed. Install it, or set DYNOTABLE_APP_PATH to the app.\n'
+      );
     });
 
     it('a malformed .dynotable.json prints one plain sentence and exits 2', async () => {

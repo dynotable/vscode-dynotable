@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {RunResult} from '../../src/protocol';
-import {renderTable} from './table';
+import {renderTable, tableOptions} from './table';
 
 const result = (
   columns: string[],
@@ -139,5 +139,27 @@ describe('renderTable', () => {
         ''
       ].join('\n')
     );
+  });
+});
+
+describe('tableOptions', () => {
+  it.each([
+    ['a terminal with no columns', {isTTY: true}, {}, {width: 120, color: true}],
+    [
+      'a terminal with NO_COLOR set',
+      {isTTY: true, columns: 80},
+      {NO_COLOR: '1'},
+      {width: 80, color: false}
+    ],
+    // no-color.org: an empty NO_COLOR is unset.
+    [
+      'a terminal with NO_COLOR empty',
+      {isTTY: true, columns: 80},
+      {NO_COLOR: ''},
+      {width: 80, color: true}
+    ],
+    ['a pipe', {columns: 80}, {}, {width: 80, color: false}]
+  ])('%s', (_, stdout, env, expected) => {
+    expect(tableOptions(stdout, env)).toEqual(expected);
   });
 });

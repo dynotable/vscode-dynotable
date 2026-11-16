@@ -1,14 +1,13 @@
 import {homedir} from 'node:os';
 import path from 'node:path';
-import type {RunResult} from '../../src/protocol';
 import {EDITOR_BRIDGE_NAME, HELP, parse, programName, type Command} from './args';
 import {createBridge} from './commands/lsp-bridge';
 import {list} from './commands/listing';
 import {readDocument, run, runAtRow} from './commands/run';
 import {EXIT, sink} from './io';
-import {emit, printText, type Printer} from './output';
+import {emit, printText, tablePrinter} from './output';
 import {createSession, type CliSession} from './session';
-import {renderTable} from './table';
+import {tableOptions} from './table';
 import {CLI_VERSION, minAppVersion} from './version';
 
 const io = sink({
@@ -20,22 +19,12 @@ const io = sink({
   }
 });
 
-/** `run --zed`: the rows as a table for a person in Zed's terminal panel. */
-const printTable: Printer = (out, {value, failure}) => {
-  if (value !== undefined) {
-    out.out(
-      renderTable(value as RunResult, {
-        width: process.stdout.columns || 120,
-        color: process.stdout.isTTY === true && !process.env.NO_COLOR
-      })
-    );
-  }
-  printText(out, failure ? {failure} : {});
-};
-
 const invocation = parse(process.argv0, process.argv.slice(2), process.env);
 // `run --zed` prints for a person in Zed's terminal. The bridge keeps JSON on stderr.
-const print = invocation.kind === 'command' && invocation.command === 'zed-run' ? printTable : emit;
+const print =
+  invocation.kind === 'command' && invocation.command === 'zed-run'
+    ? tablePrinter(tableOptions(process.stdout, process.env))
+    : emit;
 
 let session: Pick<CliSession, 'stop'> | undefined;
 let interrupted = false;
@@ -60,8 +49,9 @@ switch (invocation.kind) {
     io.exit(EXIT.ok);
     break;
   case 'usage': {
-    const printUsage = programName(process.argv0) === EDITOR_BRIDGE_NAME ? printText : emit;
-    printUsage(io, {failure: {code: 'usage', detail: invocation.message}});
+    const failure = {code: 'usage', detail: invocation.message} as const;
+    if (programName(process.argv0) === EDITOR_BRIDGE_NAME) printText(io, failure);
+    else emit(io, {failure});
     break;
   }
   case 'command':
@@ -95,11 +85,11 @@ async function start(given: Command): Promise<void> {
       io.stdin
     );
     if (!('document' in read)) {
-      printText(io, read);
+      print(io, read);
       return;
     }
     if (io.finished) return;
-    const editor = createSession({...common, agent: false, print: printTable});
+    const editor = createSession({...common, agent: given.agent, print});
     session = editor;
     await editor.run(runAtRow(read.document, given.row));
     return;
