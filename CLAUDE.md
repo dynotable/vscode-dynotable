@@ -15,3 +15,6 @@
   `media/results.ts` depends on: pinned columns come first, in `columnPinning.start` order; a
   visibility change does not re-run the global filter; the view column order comes from
   `getHeaderGroups()`, not from `getVisibleLeafColumns()`.
+- The Run task of `dynotable/zed-dynotable` (`languages/*/tasks.json`) runs `dynotable-lsp --version`
+  and matches the bare version, then `dynotable-lsp run --zed`, which reads `ZED_FILE` and
+  `ZED_ROW`. A change to that output or interface needs the same change there.
