@@ -3,7 +3,7 @@ import path from 'node:path';
 import {EDITOR_BRIDGE_NAME, HELP, parse, programName, type Command} from './args';
 import {createBridge} from './commands/lsp-bridge';
 import {list} from './commands/listing';
-import {readDocument, run} from './commands/run';
+import {readDocument, run, runAtRow} from './commands/run';
 import {EXIT, sink} from './io';
 import {emit, printText} from './output';
 import {createSession, type CliSession} from './session';
@@ -83,7 +83,10 @@ async function start(given: Command): Promise<void> {
       printText(io, read);
       return;
     }
-    printText(io, {failure: {code: 'usage', detail: 'run --zed is not available in this build.'}});
+    if (io.finished) return;
+    const editor = createSession({...common, agent: false, print: printText});
+    session = editor;
+    await editor.run(runAtRow(read.document, given.row));
     return;
   }
   const work = await workOf(given);

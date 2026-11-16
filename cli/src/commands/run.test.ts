@@ -3,9 +3,12 @@ import path from 'node:path';
 import {Readable} from 'node:stream';
 import {pathToFileURL} from 'node:url';
 import {describe, expect, it} from 'vitest';
-import {useHarness} from '../test-session';
+import {REQUEST_FAILED, type Range} from '../../../src/protocol';
+import {RpcFailure} from '../../../src/rpc';
 import type {Input} from '../args';
-import {readDocument, run} from './run';
+import {printText} from '../output';
+import {useHarness} from '../test-session';
+import {readDocument, run, runAtRow} from './run';
 
 const h = useHarness();
 
@@ -99,5 +102,107 @@ describe('run', () => {
     expect(read).toEqual({
       failure: {code: 'usage', detail: expect.stringContaining('links to another file')}
     });
+  });
+});
+
+const span = (startLine: number, endLine: number, endCharacter: number): Range => ({
+  start: {line: startLine, character: 0},
+  end: {line: endLine, character: endCharacter}
+});
+const NO_STATEMENT = (line: number) =>
+  `No statement on line ${line}. A file with a syntax error has no runnable statements.\n`;
+
+describe('runAtRow', () => {
+  const FILE = 'q.dtsql';
+  const uri = () => pathToFileURL(path.join(h.cwd, FILE)).href;
+  /** A lens in the `contract/code-lens.json` shape: a zero-width anchor, the statement in the argument. */
+  const lens = (statement: Range, command = 'dynotable.runStatement') => ({
+    range: {start: statement.start, end: statement.start},
+    command: {
+      title: command === 'dynotable.runStatement' ? 'Run' : 'Open in DynoTable',
+      command,
+      arguments: [{uri: uri(), range: statement}]
+    }
+  });
+
+  async function runAt(row: number, lenses: unknown) {
+    await runWith(row, () => lenses);
+  }
+
+  async function runWith(row: number, answer: () => unknown) {
+    await h.fake.start();
+    writeFileSync(path.join(h.cwd, FILE), STATEMENT);
+    h.fake.handle('textDocument/codeLens', answer);
+    const read = await readDocument(
+      {kind: 'file', path: FILE},
+      {cwd: h.cwd, path},
+      Readable.from([])
+    );
+    if (!('document' in read)) throw new Error(`no document: ${JSON.stringify(read)}`);
+    await h.run(runAtRow(read.document, row), {agent: false, print: printText});
+  }
+
+  it('runs the statement whose second line holds the row, with its argument unchanged', async () => {
+    await runAt(2, [lens(span(0, 0, 10)), lens(span(1, 2, 7))]);
+    expect(message('textDocument/codeLens')?.params).toEqual({
+      textDocument: {uri: uri()}
+    });
+    expect(message('workspace/executeCommand')?.params).toEqual({
+      command: 'dynotable.runStatement',
+      arguments: [
+        {uri: uri(), range: {start: {line: 1, character: 0}, end: {line: 2, character: 7}}}
+      ]
+    });
+    expect(h.codes).toEqual([0]);
+  });
+
+  it('picks the first of two statements on one row', async () => {
+    await runAt(0, [lens(span(0, 0, 10)), lens(span(0, 0, 25))]);
+    expect(message('workspace/executeCommand')?.params).toEqual({
+      command: 'dynotable.runStatement',
+      arguments: [
+        {uri: uri(), range: {start: {line: 0, character: 0}, end: {line: 0, character: 10}}}
+      ]
+    });
+  });
+
+  // A failed codeLens is that failure, never "no statement", and nothing runs.
+  it('prints the detail of a codeLens error and runs nothing', async () => {
+    await runWith(0, () => {
+      throw new RpcFailure({
+        code: REQUEST_FAILED,
+        message: 'The parser stopped.',
+        data: {code: 'run-failed'}
+      });
+    });
+    expect(h.stderr).toBe('The parser stopped.\n');
+    expect(h.codes).toEqual([1]);
+    expect(message('workspace/executeCommand')).toBeUndefined();
+  });
+
+  // The selection-style end at character 0 of the next line does not cover that line.
+  it('a row on the end line at character 0 is not in the statement', async () => {
+    await runAt(1, [lens(span(0, 1, 0))]);
+    expect(h.stderr).toBe(NO_STATEMENT(2));
+    expect(message('workspace/executeCommand')).toBeUndefined();
+  });
+
+  it('a row between statements fails with the line sentence', async () => {
+    await runAt(1, [lens(span(0, 0, 10)), lens(span(2, 2, 10))]);
+    expect(h.stderr).toBe(NO_STATEMENT(2));
+    expect(h.codes).toEqual([1]);
+    expect(message('workspace/executeCommand')).toBeUndefined();
+  });
+
+  it('a null codeLens answer fails with the line sentence', async () => {
+    await runAt(0, null);
+    expect(h.stderr).toBe(NO_STATEMENT(1));
+    expect(h.codes).toEqual([1]);
+  });
+
+  it('an Open in DynoTable lens is not run', async () => {
+    await runAt(0, [lens(span(0, 0, 10), 'dynotable.openInApp')]);
+    expect(h.stderr).toBe(NO_STATEMENT(1));
+    expect(message('workspace/executeCommand')).toBeUndefined();
   });
 });
