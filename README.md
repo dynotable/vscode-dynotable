@@ -297,7 +297,9 @@ actions write none: they give table, index and field names, never stored values.
 `dynotable-cli` always opens an agent session: every command, `dynotable-cli lsp` included. An
 agent that can run only `dynotable-cli` can read only the profiles available to agents. A process
 that can run any command as you can also read DynoTable's files, so do not give an agent more than
-`dynotable-cli`. Add this rule to your Claude Code settings:
+`dynotable-cli`. Never allow an agent `dynotable-lsp`: `dynotable-lsp run --zed` runs a statement
+in an editor session, on any profile, also one that is not available to agents, and writes no
+audit row. Add this rule to your Claude Code settings:
 
 ```json
 {
@@ -347,15 +349,22 @@ stop for the rest of the Claude Code session. Start a new Claude Code session to
 It needs DynoTable 1.20.0 or later, with the Editor integration switched on.
 It is the same program as `dynotable-cli`, under a second name. It opens an editor session: it can
 use every profile, and it does not write audit rows. It starts DynoTable with no window when the app
-is not running. Use it only in an editor, not in an agent.
+is not running. Give it to editors only, never to an agent.
 
-- It takes `--profile <id or slug>` and `--no-launch`.
+- The language server bridge takes `--profile <id or slug>` and `--no-launch`.
 - With no `--profile`, it uses the `profile` of the editor's `initializationOptions`, then
   `.dynotable.json` in the workspace root.
 - The editor must send the language ids `sql`, `partiql` and `opensearch`.
 
+`dynotable-lsp run --zed` runs one statement and prints its rows as a table. The Zed client's Run
+task uses it. It reads the file from `ZED_FILE` and the line from `ZED_ROW`, and runs the statement
+on that line. It takes no flag. It uses the `profile` of `.dynotable.json` in the current directory,
+else the only profile. Its output is plain text, not JSON. It also opens an editor session.
+
 Zed and Sublime Text have their own clients. Each one uses `dynotable-lsp` from your `PATH`, or
-installs `dynotable-cli` from npm. Both clients are pending store review.
+installs `dynotable-cli` from npm. Both clients run statements: Sublime Text shows the rows in a
+panel, and Zed prints them as a table in its terminal panel. Zed's Run needs `dynotable-cli` 0.1.2
+or later. Both clients are pending store review.
 
 - **Zed:** `dynotable/zed-dynotable`, for DynoTable SQL and PartiQL files.
 - **Sublime Text 4:** `dynotable/LSP-dynotable`, for DynoTable SQL, PartiQL and OpenSearch files.
