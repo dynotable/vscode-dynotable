@@ -28,7 +28,7 @@ import {Peer, RpcFailure} from '../../src/rpc';
 import {readDotfile} from './dotfile';
 import type {Sink} from './io';
 import {codeOfError} from './messages';
-import {emit, type Failure, type Result} from './output';
+import {emit, type Failure, type Printer, type Result} from './output';
 import {CLI_VERSION} from './version';
 
 /** What every command's `ConnectCore` is built from. */
@@ -46,6 +46,10 @@ export interface CoreOptions {
 
 export interface SessionOptions extends CoreOptions {
   io: Sink;
+  /** False for `dynotable-lsp run --zed`: an editor session, with no `purpose`. */
+  agent: boolean;
+  /** How the result and every failure are printed. Default: JSON through `emit`. */
+  print?: Printer;
   /** Where `.dynotable.json` is read when no `profile` is given. Absent: it is not read. */
   cwd?: string;
   /** `--profile`. */
@@ -128,9 +132,12 @@ export function refusedOutcome(error: WireError): StartOutcome {
   return {kind: 'refused'};
 }
 
-/** An agent session over `ConnectCore`. `ConnectCore` owns the retry, the launch and the floor. */
+/**
+ * A one-shot session over `ConnectCore`: an agent session, or an editor session for `run --zed`.
+ * `ConnectCore` owns the retry, the launch and the floor.
+ */
 export function createSession(options: SessionOptions): CliSession {
-  const {io} = options;
+  const {io, agent, print = emit} = options;
   const peers = new Map<number, Peer>();
   let profile = options.profile;
 
@@ -142,12 +149,12 @@ export function createSession(options: SessionOptions): CliSession {
       .request('initialize', {
         processId: process.pid,
         rootUri: null,
-        clientInfo: {name: 'dynotable-cli', version: CLI_VERSION},
+        clientInfo: {name: agent ? 'dynotable-cli' : 'dynotable-lsp', version: CLI_VERSION},
         capabilities: {},
         initializationOptions: {
           token: params.token,
           ...(profile === undefined ? {} : {profile}),
-          purpose: 'agent'
+          ...(agent ? {purpose: 'agent'} : {})
         }
       })
       .response.then(
@@ -181,7 +188,7 @@ export function createSession(options: SessionOptions): CliSession {
       if (profile === undefined && options.cwd !== undefined) {
         const dotfile = readDotfile(options.cwd);
         if (dotfile.kind === 'error') {
-          emit(io, {failure: {code: 'usage', detail: dotfile.message}});
+          print(io, {failure: {code: 'usage', detail: dotfile.message}});
           return;
         }
         if (dotfile.kind === 'profile') profile = dotfile.profile;
@@ -192,11 +199,11 @@ export function createSession(options: SessionOptions): CliSession {
       if (!peer) {
         await core.stop();
         // After `stop()` the state is whatever it was; the interrupt has printed already.
-        if (state.kind === 'latched') emit(io, {failure: {code: state.reason}});
+        if (state.kind === 'latched') print(io, {failure: {code: state.reason}});
         return;
       }
       const result = await work(connection(peer));
-      emit(io, result);
+      print(io, result);
       await close(peer);
     },
     stop: () => core.stop()
