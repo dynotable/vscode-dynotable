@@ -31,6 +31,7 @@ import {releaseFloor} from '../src/version.ts';
 /** The Bun target of each platform package. Baseline builds run on x64 CPUs without AVX2. */
 const BUN_TARGETS = {
   'darwin-arm64': 'bun-darwin-arm64',
+  'darwin-x64': 'bun-darwin-x64-baseline',
   'linux-x64': 'bun-linux-x64-baseline',
   'win-x64': 'bun-windows-x64-baseline'
 };

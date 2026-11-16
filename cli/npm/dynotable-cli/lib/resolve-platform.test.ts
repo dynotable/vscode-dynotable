@@ -17,6 +17,12 @@ it('darwin-arm64 resolves to its package binary', () => {
   );
 });
 
+it('darwin-x64 resolves to its package binary', () => {
+  expect(resolveBinary('darwin', 'x64', installed('@dynotable/cli-darwin-x64'))).toBe(
+    join('/nm', '@dynotable/cli-darwin-x64', 'bin', 'dynotable-cli')
+  );
+});
+
 it('win32 resolves to the win package and the .exe', () => {
   expect(resolveBinary('win32', 'x64', installed('@dynotable/cli-win-x64'))).toBe(
     join('/nm', '@dynotable/cli-win-x64', 'bin', 'dynotable-cli.exe')
@@ -24,8 +30,8 @@ it('win32 resolves to the win package and the .exe', () => {
 });
 
 it('an unsupported platform names it and the Releases URL', () => {
-  expect(() => resolveBinary('darwin', 'x64', installed())).toThrow(
-    `dynotable-cli has no binary for darwin-x64. See ${RELEASES_URL}`
+  expect(() => resolveBinary('linux', 'arm64', installed())).toThrow(
+    `dynotable-cli has no binary for linux-arm64. See ${RELEASES_URL}`
   );
 });
 

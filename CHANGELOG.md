@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- `dynotable-cli` 0.1.2 adds a binary for macOS on Intel.
+- The README names the Zed and Sublime Text clients for `dynotable-lsp`.
+
 ## 0.3.0 — 2026-11-11
 
 - The results panel shows the rows in a grid. Sort, find and filter the rows, and filter a column

@@ -10,6 +10,7 @@ export const RELEASES_URL = 'https://github.com/dynotable/vscode-dynotable/relea
 /** @type {readonly Target[]} */
 export const TARGETS = [
   {platform: 'darwin', arch: 'arm64', name: 'darwin-arm64'},
+  {platform: 'darwin', arch: 'x64', name: 'darwin-x64'},
   {platform: 'linux', arch: 'x64', name: 'linux-x64'},
   {platform: 'win32', arch: 'x64', name: 'win-x64'}
 ];
