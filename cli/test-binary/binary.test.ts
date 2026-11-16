@@ -5,7 +5,7 @@ import {existsSync, linkSync, mkdtempSync, readFileSync, rmSync, writeFileSync} 
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {setTimeout as sleep} from 'node:timers/promises';
-import {afterEach, beforeAll, beforeEach, expect, it} from 'vitest';
+import {afterEach, beforeAll, beforeEach, describe, expect, it} from 'vitest';
 import {FakeServer} from '../../src/test-integration/fake-server';
 import {frame, FrameReader} from '../../src/rpc';
 import {binaryName, targetOf} from '../npm/dynotable-cli/lib/resolve-platform.mjs';
@@ -69,10 +69,13 @@ interface Run {
  * Starts the binary. It reads the port file under a temp user data directory, which also turns
  * launching off, so it never reaches an installed app.
  */
-function start(args: string[], options: {argv0?: string; binary?: string} = {}): Run {
+function start(
+  args: string[],
+  options: {argv0?: string; binary?: string; env?: Record<string, string>} = {}
+): Run {
   const child = spawn(options.binary ?? BINARY, args, {
     cwd: home,
-    env: {PATH: process.env.PATH, HOME: home, DYNOTABLE_USER_DATA_DIR: userData},
+    env: {PATH: process.env.PATH, HOME: home, DYNOTABLE_USER_DATA_DIR: userData, ...options.env},
     ...(options.argv0 === undefined ? {} : {argv0: options.argv0})
   });
   const out: Buffer[] = [];
@@ -212,4 +215,71 @@ it.each([
   expect(purposeOf(fake.initializeParams[0])).toBe(purpose);
   run.stdin.end();
   expect(await within(run.ended, END_MS)).toEqual({code: 0, signal: null});
+});
+
+describe('dynotable-lsp run --zed', () => {
+  /** Two adjacent statements, so a pick by the wrong row runs the neighbour. */
+  const STATEMENTS = 'SELECT * FROM "orders"\nSELECT * FROM "customers"\n';
+  const FIRST = {start: {line: 0, character: 0}, end: {line: 0, character: 22}};
+  const SECOND = {start: {line: 1, character: 0}, end: {line: 1, character: 25}};
+
+  function zedRun(row: number): Run {
+    const file = join(home, 'q.dtsql');
+    writeFileSync(file, STATEMENTS);
+    fake.handle('textDocument/codeLens', (params) => {
+      const {uri} = (params as {textDocument: {uri: string}}).textDocument;
+      return [FIRST, SECOND].map((range) => ({
+        range: {start: range.start, end: range.start},
+        command: {title: 'Run', command: 'dynotable.runStatement', arguments: [{uri, range}]}
+      }));
+    });
+    return start(['run', '--zed'], {
+      argv0: 'dynotable-lsp',
+      env: {ZED_FILE: file, ZED_ROW: String(row)}
+    });
+  }
+
+  it('runs the statement on ZED_ROW in an editor session and prints a plain table', async () => {
+    const run = zedRun(2);
+    expect(await within(run.ended, END_MS)).toEqual({code: 0, signal: null});
+    expect(purposeOf(fake.initializeParams[0])).toBeUndefined();
+    const command = fake.received.find((message) => message.method === 'workspace/executeCommand');
+    expect(command?.params).toMatchObject({
+      command: 'dynotable.runStatement',
+      arguments: [{range: SECOND}]
+    });
+    const stdout = run.stdout().toString('utf8');
+    expect(stdout).toContain('│ o.orderId     │ o.status  │ c.country  │\n');
+    // stdout is a pipe, not a TTY: no colour.
+    expect(stdout).not.toContain('\x1b');
+    expect(run.stderr()).toBe('');
+  });
+
+  it('SIGINT during the run exits 130 with a plain sentence', async () => {
+    fake.holdRuns = true;
+    const run = zedRun(1);
+    await until(
+      () => fake.received.some((message) => message.method === 'workspace/executeCommand'),
+      'the run'
+    );
+    run.kill('SIGINT');
+    expect(await within(run.ended, END_MS)).toEqual({code: 130, signal: null});
+    expect(run.stdout().length).toBe(0);
+    expect(run.stderr()).toBe('Interrupted.\n');
+    await until(() => fake.sessions.size === 0, 'the session to close');
+  });
+
+  it('a ZED_FILE that is not a DynamoDB file name exits 2 before it connects', async () => {
+    const notes = join(home, 'notes.txt');
+    writeFileSync(notes, 'SELECT * FROM "orders"');
+    const run = start(['run', '--zed'], {
+      argv0: 'dynotable-lsp',
+      env: {ZED_FILE: notes, ZED_ROW: '1'}
+    });
+    expect(await within(run.ended, END_MS)).toEqual({code: 2, signal: null});
+    expect(run.stderr()).toBe(
+      `${notes}: the name must end in .dtsql, .dynotable.sql, .partiql, .opensearch.\n`
+    );
+    expect(fake.initializeParams).toEqual([]);
+  });
 });

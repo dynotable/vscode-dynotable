@@ -4,6 +4,8 @@
 
 - `dynotable-cli` 0.1.2 adds a binary for macOS on Intel.
 - The README names the Zed and Sublime Text clients for `dynotable-lsp`.
+- `dynotable-lsp run --zed` runs the statement on one line of a file and prints its rows as a
+  table. The Zed client's Run task uses it.
 
 ## 0.3.0 — 2026-11-11
 
