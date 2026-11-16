@@ -1,7 +1,8 @@
 import {describe, expect, it} from 'vitest';
 import {parse} from './args';
 
-const cli = (...args: string[]) => parse('dynotable-cli', args);
+const cli = (...args: string[]) => parse('dynotable-cli', args, {});
+const zedEnv = {ZED_FILE: "/w/it's a file.dtsql", ZED_ROW: '3'};
 
 describe('subcommands', () => {
   it.each([
@@ -76,7 +77,7 @@ describe('argv0', () => {
   it.each(['/usr/local/bin/dynotable-lsp', 'C:\\Tools\\DynoTable-LSP.exe'])(
     '%s is the editor bridge: no purpose',
     (argv0) => {
-      expect(parse(argv0, ['--profile', 'dev'])).toEqual({
+      expect(parse(argv0, ['--profile', 'dev'], {})).toEqual({
         kind: 'command',
         command: 'lsp',
         agent: false,
@@ -86,15 +87,54 @@ describe('argv0', () => {
     }
   );
 
-  // Else an agent allowed only `dynotable-lsp` could reach the one-shot commands, or the reverse.
+  // `dynotable-lsp` gives only editor sessions: the bridge and the Zed task's `run --zed`. Else
+  // an agent allowed only `dynotable-lsp` could reach the agent commands, or the reverse.
   it.each([['lsp'], ['run', '-e', 'SELECT 1', '--lang', 'sql'], ['profiles']])(
     'dynotable-lsp refuses the subcommand %s',
     (...args) => {
-      expect(parse('dynotable-lsp', args)).toMatchObject({kind: 'usage'});
+      expect(parse('dynotable-lsp', args, zedEnv)).toMatchObject({kind: 'usage'});
     }
   );
 
   it('dynotable-lsp refuses a one-shot flag', () => {
-    expect(parse('dynotable-lsp', ['--row-cap', '5'])).toMatchObject({kind: 'usage'});
+    expect(parse('dynotable-lsp', ['--row-cap', '5'], {})).toMatchObject({kind: 'usage'});
+  });
+});
+
+describe('dynotable-lsp run --zed', () => {
+  // Zed does not escape the file name in a task command, so it comes only from the environment.
+  it('reads the file and the 1-based ZED_ROW from the environment', () => {
+    expect(parse('dynotable-lsp', ['run', '--zed'], zedEnv)).toEqual({
+      kind: 'command',
+      command: 'zed-run',
+      agent: false,
+      launch: true,
+      file: "/w/it's a file.dtsql",
+      row: 2,
+      line: 3
+    });
+  });
+
+  it.each([
+    ['ZED_FILE empty', {...zedEnv, ZED_FILE: ''}],
+    ['ZED_ROW unset', {ZED_FILE: zedEnv.ZED_FILE}],
+    ['ZED_ROW 0', {...zedEnv, ZED_ROW: '0'}],
+    ['ZED_ROW not a whole number', {...zedEnv, ZED_ROW: '3abc'}]
+  ])('%s is a usage error', (_name, env) => {
+    expect(parse('dynotable-lsp', ['run', '--zed'], env)).toMatchObject({kind: 'usage'});
+  });
+
+  // It never runs a file given on the command line or another profile than the project's.
+  it.each([
+    ['a file', ['run', '--zed', 'q.dtsql']],
+    ['a flag', ['run', '--zed', '--profile', 'x']],
+    ['--zed without run', ['--zed']],
+    ['run without --zed', ['run', 'q.dtsql']]
+  ])('dynotable-lsp refuses %s', (_name, args) => {
+    expect(parse('dynotable-lsp', args, zedEnv)).toMatchObject({kind: 'usage'});
+  });
+
+  it('dynotable-cli refuses run --zed', () => {
+    expect(parse('dynotable-cli', ['run', '--zed'], zedEnv)).toMatchObject({kind: 'usage'});
   });
 });

@@ -33,7 +33,7 @@ describe('the Claude Code plugin', () => {
 
     // A launching bridge that Claude Code restarts would revive an app the user quit.
     it('runs the agent bridge without launching the app', () => {
-      expect(parse(server.command, server.args)).toMatchObject({
+      expect(parse(server.command, server.args, {})).toMatchObject({
         kind: 'command',
         command: 'lsp',
         agent: true,

@@ -29,6 +29,8 @@ export type Command = CommandBase &
     | {command: 'lsp'}
     | {command: 'profiles' | 'tables' | 'indices'}
     | {command: 'run'; input: Input; rowCap?: number}
+    // `dynotable-lsp run --zed`: the statement at one line of ZED_FILE, in an editor session.
+    | {command: 'zed-run'; file: string; row: number; line: number}
   );
 
 export type Invocation =
@@ -43,6 +45,7 @@ const OPTIONS = {
   lang: {type: 'string'},
   expression: {type: 'string', short: 'e'},
   'no-launch': {type: 'boolean'},
+  zed: {type: 'boolean'},
   help: {type: 'boolean'},
   version: {type: 'boolean'}
 } as const;
@@ -63,6 +66,7 @@ const FLAG_NAMES: Record<Option, string> = {
   lang: '--lang',
   expression: '-e',
   'no-launch': '--no-launch',
+  zed: '--zed',
   help: '--help',
   version: '--version'
 };
@@ -77,9 +81,13 @@ function programName(argv0: string): string {
 
 /**
  * Parses the command line. `argv0` is the name the binary was started under; `args` are the
- * arguments after it.
+ * arguments after it; `env` gives `run --zed` its file and line.
  */
-export function parse(argv0: string, args: readonly string[]): Invocation {
+export function parse(
+  argv0: string,
+  args: readonly string[],
+  env: Readonly<Record<string, string | undefined>>
+): Invocation {
   let parsed;
   try {
     parsed = parseArgs({args: [...args], options: OPTIONS, allowPositionals: true, strict: true});
@@ -92,8 +100,11 @@ export function parse(argv0: string, args: readonly string[]): Invocation {
   const given = (Object.keys(values) as Option[]).filter((name) => values[name] !== undefined);
 
   if (programName(argv0) === EDITOR_BRIDGE_NAME) {
+    if (positionals[0] === 'run') return zedRun(positionals.slice(1), given, env);
     if (positionals.length > 0) {
-      return usage(`${EDITOR_BRIDGE_NAME} takes no subcommand; it only bridges an editor.`);
+      return usage(
+        `${EDITOR_BRIDGE_NAME} takes one subcommand, run --zed; without it, it bridges an editor.`
+      );
     }
     const refused = given.find((name) => !ALLOWED.lsp.includes(name));
     if (refused) return usage(`${EDITOR_BRIDGE_NAME} does not take ${FLAG_NAMES[refused]}.`);
@@ -152,6 +163,34 @@ export function parse(argv0: string, args: readonly string[]): Invocation {
   return {...base, command: 'run', input, ...(rowCap === undefined ? {} : {rowCap})};
 }
 
+/** `dynotable-lsp run --zed`: Zed's task environment names the file and the 1-based line. */
+function zedRun(
+  rest: readonly string[],
+  given: readonly Option[],
+  env: Readonly<Record<string, string | undefined>>
+): Invocation {
+  if (!given.includes('zed')) return usage(`${EDITOR_BRIDGE_NAME} run needs --zed.`);
+  if (rest.length > 0) return usage('run --zed takes no file; it reads ZED_FILE and ZED_ROW.');
+  const refused = given.find((name) => name !== 'zed');
+  if (refused) return usage(`run --zed does not take ${FLAG_NAMES[refused]}.`);
+  const file = env.ZED_FILE;
+  if (!file) return usage('ZED_FILE must name the file to run.');
+  const row = env.ZED_ROW;
+  if (row === undefined || !/^[1-9]\d*$/.test(row)) {
+    return usage('ZED_ROW must be a line number of 1 or more.');
+  }
+  const line = Number(row);
+  return {
+    kind: 'command',
+    command: 'zed-run',
+    agent: false,
+    launch: true,
+    file,
+    row: line - 1,
+    line
+  };
+}
+
 function common(values: {profile?: string; 'no-launch'?: boolean}) {
   return {
     launch: !values['no-launch'],
@@ -162,6 +201,10 @@ function common(values: {profile?: string; 'no-launch'?: boolean}) {
 export const HELP = `Usage: dynotable-cli <subcommand> [options]
 
 Reads DynamoDB and OpenSearch through the DynoTable app. Output is JSON.
+
+Under the name dynotable-lsp, the binary bridges an editor's Language Server stdio to the app.
+  dynotable-lsp run --zed      Run the statement at line ZED_ROW of ZED_FILE in an editor
+                               session, for the Zed Run task. Output is plain text.
 
 Subcommands:
   profiles                     List the profiles available to agents.
