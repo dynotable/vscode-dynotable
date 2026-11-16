@@ -1,11 +1,11 @@
 import {homedir} from 'node:os';
 import path from 'node:path';
-import {HELP, parse, type Command} from './args';
+import {EDITOR_BRIDGE_NAME, HELP, parse, programName, type Command} from './args';
 import {createBridge} from './commands/lsp-bridge';
 import {list} from './commands/listing';
 import {readDocument, run} from './commands/run';
 import {EXIT, sink} from './io';
-import {emit} from './output';
+import {emit, printText} from './output';
 import {createSession, type CliSession} from './session';
 import {CLI_VERSION, minAppVersion} from './version';
 
@@ -18,12 +18,16 @@ const io = sink({
   }
 });
 
+const invocation = parse(process.argv0, process.argv.slice(2), process.env);
+// `run --zed` prints for a person in Zed's terminal. The bridge keeps JSON on stderr.
+const print = invocation.kind === 'command' && invocation.command === 'zed-run' ? printText : emit;
+
 let session: Pick<CliSession, 'stop'> | undefined;
 let interrupted = false;
 process.on('SIGINT', () => {
   if (interrupted) return;
   interrupted = true;
-  emit(io, {failure: {code: 'interrupted'}});
+  print(io, {failure: {code: 'interrupted'}});
   // A stdin read in progress must not hold the process open.
   io.stdin.destroy();
   void session?.stop();
@@ -31,7 +35,6 @@ process.on('SIGINT', () => {
 // The editor or the reader of the output is gone: end as when stdin closes.
 process.stdout.on('error', () => io.stdin.destroy());
 
-const invocation = parse(process.argv0, process.argv.slice(2), process.env);
 switch (invocation.kind) {
   case 'help':
     io.out(HELP);
@@ -41,13 +44,15 @@ switch (invocation.kind) {
     io.out(`${CLI_VERSION}\n`);
     io.exit(EXIT.ok);
     break;
-  case 'usage':
-    emit(io, {failure: {code: 'usage', detail: invocation.message}});
+  case 'usage': {
+    const printUsage = programName(process.argv0) === EDITOR_BRIDGE_NAME ? printText : emit;
+    printUsage(io, {failure: {code: 'usage', detail: invocation.message}});
     break;
+  }
   case 'command':
     // A bug must still end in the stderr contract, not in a stack trace.
     start(invocation).catch((error: unknown) =>
-      emit(io, {failure: {code: 'run-failed', detail: (error as Error).message}})
+      print(io, {failure: {code: 'run-failed', detail: (error as Error).message}})
     );
     break;
 }
@@ -69,7 +74,16 @@ async function start(given: Command): Promise<void> {
     return;
   }
   if (given.command === 'zed-run') {
-    emit(io, {failure: {code: 'usage', detail: 'run --zed is not available in this build.'}});
+    const read = await readDocument(
+      {kind: 'file', path: given.file},
+      {cwd: process.cwd(), path},
+      io.stdin
+    );
+    if (!('document' in read)) {
+      printText(io, read);
+      return;
+    }
+    printText(io, {failure: {code: 'usage', detail: 'run --zed is not available in this build.'}});
     return;
   }
   const work = await workOf(given);
@@ -77,7 +91,10 @@ async function start(given: Command): Promise<void> {
   if (!work || io.finished) return;
   // A listing of profiles needs no profile, so a broken .dynotable.json must not stop it.
   const {cwd, ...rest} = common;
-  const oneShot = createSession(given.command === 'profiles' ? rest : {...rest, cwd});
+  const oneShot = createSession({
+    ...(given.command === 'profiles' ? rest : {...rest, cwd}),
+    agent: true
+  });
   session = oneShot;
   await oneShot.run(work);
 }

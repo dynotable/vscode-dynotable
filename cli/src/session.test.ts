@@ -2,8 +2,9 @@ import {mkdirSync, writeFileSync} from 'node:fs';
 import {createServer, type Server} from 'node:net';
 import {join} from 'node:path';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {listTablesSchema, type WireError} from '../../src/protocol';
+import {listTablesSchema, REQUEST_FAILED, type WireError} from '../../src/protocol';
 import {RpcFailure} from '../../src/rpc';
+import {printText} from './output';
 import type {SessionOptions} from './session';
 import {useHarness} from './test-session';
 
@@ -162,5 +163,61 @@ describe('session', () => {
     await listTables({profile: 'profile-2-slug'});
     expect(h.codes).toEqual([1]);
     expect(h.failure().code).toBe('profile-not-exposed');
+  });
+
+  describe('editor session with the text printer (dynotable-lsp run --zed)', () => {
+    const editor = {agent: false, print: printText} as const;
+
+    it('sends no purpose and the dynotable-lsp clientInfo', async () => {
+      await h.fake.start();
+      await listTables(editor);
+      expect(h.codes).toEqual([0]);
+      const params = h.fake.initializeParams[0] as Record<string, unknown>;
+      expect(params.initializationOptions).toEqual({token: h.fake.token});
+      expect(params.clientInfo).toEqual({name: 'dynotable-lsp', version: '0.0.0-dev'});
+    });
+
+    // The shared sentence names --no-launch and DYNOTABLE_USER_DATA_DIR, which the Zed task never sets.
+    it('launcher-off prints its own sentence and exits 1', async () => {
+      await listTables(editor);
+      expect(h.codes).toEqual([1]);
+      expect(h.stderr).toBe('DynoTable is not running. Start DynoTable.\n');
+    });
+
+    it('a malformed .dynotable.json prints one plain sentence and exits 2', async () => {
+      await h.fake.start();
+      writeFileSync(join(h.cwd, '.dynotable.json'), '{not json');
+      await listTables(editor);
+      expect(h.codes).toEqual([2]);
+      expect(h.stderr).toBe(`${join(h.cwd, '.dynotable.json')} is not valid JSON.\n`);
+      expect(h.fake.initializeParams).toEqual([]);
+    });
+
+    // The app's detail says to reconnect with initializationOptions.profile, which Run cannot do.
+    it('profile-required prints its own sentence, not the app detail', async () => {
+      await h.fake.start();
+      h.fake.handle('dynotable/listTables', () => {
+        throw new RpcFailure(h.fake.fixture('error-profile-required.json') as WireError);
+      });
+      await listTables(editor);
+      expect(h.codes).toEqual([1]);
+      expect(h.stderr).toBe(
+        'No profile is chosen. Name one profile in .dynotable.json in the project folder.\n'
+      );
+    });
+
+    it('an app detail holding ESC prints it visibly, never as an escape sequence', async () => {
+      await h.fake.start();
+      h.fake.handle('dynotable/listTables', () => {
+        throw new RpcFailure({
+          code: REQUEST_FAILED,
+          message: 'Table \u001b[2Jorders failed.',
+          data: {code: 'run-failed'}
+        });
+      });
+      await listTables(editor);
+      expect(h.codes).toEqual([1]);
+      expect(h.stderr).toBe('Table \\x1b[2Jorders failed.\n');
+    });
   });
 });

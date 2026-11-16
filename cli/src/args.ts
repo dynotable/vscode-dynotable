@@ -74,7 +74,7 @@ const FLAG_NAMES: Record<Option, string> = {
 const usage = (message: string): Invocation => ({kind: 'usage', message});
 
 /** The program name without its directory and a Windows `.exe`. */
-function programName(argv0: string): string {
+export function programName(argv0: string): string {
   const base = argv0.split(/[\\/]/).pop() ?? '';
   return base.replace(/\.exe$/i, '').toLowerCase();
 }

@@ -44,6 +44,7 @@ export function useHarness(): Harness {
         env: {},
         home: harness.home,
         io,
+        agent: true,
         // A test must never start an installed app.
         launch: false,
         cwd: harness.cwd,
