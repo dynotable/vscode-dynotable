@@ -90,13 +90,16 @@ repo.
 
 The CLI has its own version, in `cli/npm/dynotable-cli/package.json`, and its own tags: `cli-v<version>`.
 
-1. Set `version` in the wrapper and the same version on its three `@dynotable/cli-*`
+1. Set `version` in the wrapper and the same version on its four `@dynotable/cli-*`
    `optionalDependencies`. The build refuses a mismatch.
 2. Merge, then push the tag `cli-v<version>` on the merge commit. `.github/workflows/release-cli.yml`
-   runs the checks, builds the three binaries, publishes the platform packages and then the wrapper
+   runs the checks, builds the four binaries, publishes the platform packages and then the wrapper
    with npm Trusted Publishing, and creates the GitHub Release with the archives and `SHA256SUMS.txt`.
+3. Pin the new version in `dynotable/LSP-dynotable` (`server/`), generate its lockfile again and
+   push a new tag. Package Control installs the CLI from that lockfile. `dynotable/zed-dynotable`
+   needs nothing: the Zed extension installs the latest `dynotable-cli`.
 
-Each of the four packages names `dynotable/vscode-dynotable` and `release-cli.yml` as its Trusted
+Each of the five packages names `dynotable/vscode-dynotable` and `release-cli.yml` as its Trusted
 Publisher on npmjs.com (package Settings → Trusted Publisher → GitHub Actions). A new package cannot
 do that before it exists: its first version is published by hand, with `npm login` as
 `dynotable-user` and the account's security key for each publish.

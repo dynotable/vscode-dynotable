@@ -1,6 +1,6 @@
 {
   "name": "dynotable-cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Query DynamoDB and OpenSearch through the DynoTable app from the command line, and bridge editors to its language server. Requires the DynoTable desktop app.",
   "license": "MIT",
   "homepage": "https://dynotable.com/docs/dynotable-cli",
@@ -34,8 +34,9 @@
     "node": ">=18"
   },
   "optionalDependencies": {
-    "@dynotable/cli-darwin-arm64": "0.1.1",
-    "@dynotable/cli-linux-x64": "0.1.1",
-    "@dynotable/cli-win-x64": "0.1.1"
+    "@dynotable/cli-darwin-arm64": "0.1.2",
+    "@dynotable/cli-darwin-x64": "0.1.2",
+    "@dynotable/cli-linux-x64": "0.1.2",
+    "@dynotable/cli-win-x64": "0.1.2"
   }
 }

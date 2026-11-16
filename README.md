@@ -196,9 +196,9 @@ No data reaches the agent.
 - **Windows:** use the Releases archive and put the folder that holds `dynotable-cli.exe` on your
   `PATH`. The Claude Code plugin cannot start the command that npm installs on Windows.
 
-Binaries are available for macOS on Apple silicon, Linux x64 and Windows x64. The macOS binary is
-tested on each build, and the Linux x64 binary was run in a container. The Windows binary has not
-been run yet.
+Binaries are available for macOS on Apple silicon and Intel, Linux x64 and Windows x64. The Apple
+silicon binary is tested on each build, and the Linux x64 binary was run in a container. The Intel
+binary was run only under Rosetta on Apple silicon. The Windows binary has not been run yet.
 
 ### Commands
 
@@ -353,6 +353,13 @@ is not running. Use it only in an editor, not in an agent.
 - With no `--profile`, it uses the `profile` of the editor's `initializationOptions`, then
   `.dynotable.json` in the workspace root.
 - The editor must send the language ids `sql`, `partiql` and `opensearch`.
+
+Zed and Sublime Text have their own clients. Each one uses `dynotable-lsp` from your `PATH`, or
+installs `dynotable-cli` from npm. Both clients are pending store review.
+
+- **Zed:** `dynotable/zed-dynotable`, for DynoTable SQL and PartiQL files.
+- **Sublime Text 4:** `dynotable/LSP-dynotable`, for DynoTable SQL, PartiQL and OpenSearch files.
+  It needs the LSP package.
 
 Neovim 0.10 or later:
 
