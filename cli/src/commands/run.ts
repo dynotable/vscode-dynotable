@@ -1,7 +1,7 @@
 import {readFile, realpath} from 'node:fs/promises';
 import type {Readable} from 'node:stream';
 import {text} from 'node:stream/consumers';
-import {runResultSchema} from '../../../src/protocol';
+import {codeLensListSchema, nullable, runResultSchema, type CodeLens} from '../../../src/protocol';
 import type {Input} from '../args';
 import {locate, type Place, type TextDocument} from '../document';
 import type {Failure, Result} from '../output';
@@ -57,6 +57,53 @@ export function run(
         command: 'dynotable.runStatement',
         arguments: [{uri: document.uri, ...(rowCap === undefined ? {} : {rowCap})}]
       },
+      runResultSchema
+    );
+  };
+}
+
+const RUN = 'dynotable.runStatement';
+
+/**
+ * The first Run lens whose statement holds `row` (0-based). The statement range is in the lens's
+ * argument; the lens's own range is only an anchor. An end at character 0 of a later line does not
+ * hold that line.
+ */
+function runLensAt(lenses: CodeLens[], row: number): CodeLens | undefined {
+  return lenses.find((lens) => {
+    const statement = lens.command.arguments[0].range;
+    if (lens.command.command !== RUN || !statement) return false;
+    const {start, end} = statement;
+    const last = end.character === 0 && end.line > start.line ? end.line - 1 : end.line;
+    return start.line <= row && row <= last;
+  });
+}
+
+/** Opens the document and runs the one statement at `row` (0-based), never the whole document. */
+export function runAtRow(
+  document: TextDocument,
+  row: number
+): (connection: Connection) => Promise<Result> {
+  return async (connection) => {
+    connection.notify('textDocument/didOpen', {textDocument: {...document, version: 1}});
+    const lenses = await connection.request(
+      'textDocument/codeLens',
+      {textDocument: {uri: document.uri}},
+      nullable(codeLensListSchema)
+    );
+    if ('failure' in lenses) return lenses;
+    const lens = runLensAt(lenses.value ?? [], row);
+    if (!lens) {
+      return {
+        failure: {
+          code: 'run-failed',
+          detail: `No statement on line ${row + 1}. A file with a syntax error has no runnable statements.`
+        }
+      };
+    }
+    return connection.request(
+      'workspace/executeCommand',
+      {command: RUN, arguments: lens.command.arguments},
       runResultSchema
     );
   };

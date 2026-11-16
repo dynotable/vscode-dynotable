@@ -167,7 +167,7 @@ const nonEmpty = schema<string>((value, _mode, path) =>
   typeof value === 'string' && value !== '' ? undefined : `${path}: expected a non-empty string`
 );
 
-const nullable = <T>(inner: Schema<T>) =>
+export const nullable = <T>(inner: Schema<T>) =>
   schema<T | null>((value, mode, path) =>
     value === null ? undefined : inner.check(value, mode, path)
   );
