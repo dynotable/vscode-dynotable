@@ -4,6 +4,7 @@ import {join} from 'node:path';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {listTablesSchema, REQUEST_FAILED, type WireError} from '../../src/protocol';
 import {RpcFailure} from '../../src/rpc';
+import {EXIT} from './io';
 import {printText, type Printer} from './output';
 import type {SessionOptions} from './session';
 import {useHarness} from './test-session';
@@ -20,7 +21,7 @@ afterEach(() => {
 });
 
 /** `printText` for a failure; the success value of `listTables` is not printed. */
-const plainText: Printer = (io, {failure}) => (failure ? printText(io, failure) : io.exit(0));
+const plainText: Printer = (io, {failure}) => (failure ? printText(io, failure) : io.exit(EXIT.ok));
 
 /** One `listTables` through a session, as a one-shot command does it. */
 const listTables = (options: Partial<SessionOptions> = {}) =>

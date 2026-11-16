@@ -1,4 +1,5 @@
 import {parseArgs} from 'node:util';
+import type {Env} from '../../src/discovery';
 
 export const SUBCOMMANDS = ['lsp', 'profiles', 'tables', 'indices', 'run'] as const;
 export type Subcommand = (typeof SUBCOMMANDS)[number];
@@ -83,11 +84,7 @@ export function programName(argv0: string): string {
  * Parses the command line. `argv0` is the name the binary was started under; `args` are the
  * arguments after it; `env` gives `run --zed` its file and row.
  */
-export function parse(
-  argv0: string,
-  args: readonly string[],
-  env: Readonly<Record<string, string | undefined>>
-): Invocation {
+export function parse(argv0: string, args: readonly string[], env: Readonly<Env>): Invocation {
   let parsed;
   try {
     parsed = parseArgs({args: [...args], options: OPTIONS, allowPositionals: true, strict: true});
@@ -164,11 +161,7 @@ export function parse(
 }
 
 /** `dynotable-lsp run --zed`: Zed's task environment names the file and the 1-based line. */
-function zedRun(
-  rest: readonly string[],
-  given: readonly Option[],
-  env: Readonly<Record<string, string | undefined>>
-): Invocation {
+function zedRun(rest: readonly string[], given: readonly Option[], env: Readonly<Env>): Invocation {
   if (!given.includes('zed')) return usage(`${EDITOR_BRIDGE_NAME} run needs --zed.`);
   if (rest.length > 0) return usage('run --zed takes no file; it reads ZED_FILE and ZED_ROW.');
   const refused = given.find((name) => name !== 'zed');

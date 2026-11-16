@@ -6,7 +6,7 @@ import {describe, expect, it} from 'vitest';
 import {REQUEST_FAILED, type Range} from '../../../src/protocol';
 import {RpcFailure} from '../../../src/rpc';
 import type {Input} from '../args';
-import {tablePrinter} from '../output';
+import {tablePrinter} from '../table';
 import {useHarness} from '../test-session';
 import {readDocument, run, runAtRow} from './run';
 

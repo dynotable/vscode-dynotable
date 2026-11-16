@@ -1,15 +1,10 @@
+import type {Env} from '../../src/discovery';
 import {cellKind, isEmpty, isNumericColumn, MISSING, type Cell} from '../../src/grid-model';
 import type {RunResult} from '../../src/protocol';
 import {summary} from '../../src/results-model';
 import {visible} from './display';
-
-/** The table options for a stdout: colour only on a terminal, and not when `NO_COLOR` is set. */
-export function tableOptions(
-  stdout: {columns?: number; isTTY?: boolean},
-  env: Readonly<Record<string, string | undefined>>
-): TableOptions {
-  return {width: stdout.columns || 120, color: stdout.isTTY === true && !env.NO_COLOR};
-}
+import {EXIT} from './io';
+import {printText, type Printer} from './output';
 
 export interface TableOptions {
   /** The terminal's width in characters. */
@@ -17,6 +12,23 @@ export interface TableOptions {
   /** Bold header, dim borders and dim empty cells. */
   color: boolean;
 }
+
+/** The table options for a stdout: colour only on a terminal, and not when `NO_COLOR` is set. */
+export function tableOptions(
+  stdout: {columns?: number; isTTY?: boolean},
+  env: Readonly<Env>
+): TableOptions {
+  return {width: stdout.columns || 120, color: stdout.isTTY === true && !env.NO_COLOR};
+}
+
+/** `run --zed`: the rows as a table for a person in Zed's terminal panel, a failure as plain text. */
+export const tablePrinter =
+  (options: TableOptions): Printer =>
+  (io, {value, failure}) => {
+    if (value !== undefined) io.out(renderTable(value as RunResult, options));
+    if (failure) printText(io, failure);
+    else io.exit(EXIT.ok);
+  };
 
 /** A column is not cut below this width: past it the table prints wider and the terminal wraps. */
 const MIN_CUT = 8;
@@ -77,9 +89,9 @@ export function renderTable(result: RunResult, {width, color}: TableOptions): st
       return {name, cells, numeric: isNumericColumn(cells), width: widest};
     });
     shrink(table, width);
-    const bar = paint(DIM, '│');
+    const bar = dim('│');
     const border = (left: string, middle: string, right: string) =>
-      paint(DIM, left + table.map((column) => '─'.repeat(column.width + 2)).join(middle) + right);
+      dim(left + table.map((column) => '─'.repeat(column.width + 2)).join(middle) + right);
     const line = (texts: string[]) => `${bar} ${texts.join(` ${bar} `)} ${bar}`;
 
     lines.push(border('┌', '┬', '┐'));

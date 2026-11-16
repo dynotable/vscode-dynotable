@@ -25,6 +25,7 @@ import {
   type WireError
 } from '../../src/protocol';
 import {Peer, RpcFailure} from '../../src/rpc';
+import {EDITOR_BRIDGE_NAME} from './args';
 import {readDotfile} from './dotfile';
 import type {Sink} from './io';
 import {codeOfError} from './messages';
@@ -149,7 +150,7 @@ export function createSession(options: SessionOptions): CliSession {
       .request('initialize', {
         processId: process.pid,
         rootUri: null,
-        clientInfo: {name: agent ? 'dynotable-cli' : 'dynotable-lsp', version: CLI_VERSION},
+        clientInfo: {name: agent ? 'dynotable-cli' : EDITOR_BRIDGE_NAME, version: CLI_VERSION},
         capabilities: {},
         initializationOptions: {
           token: params.token,

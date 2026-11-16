@@ -44,6 +44,8 @@ export async function readDocument(
   }
 }
 
+const RUN = 'dynotable.runStatement';
+
 /** Opens the document and runs all of it as one statement. */
 export function run(
   document: TextDocument,
@@ -54,15 +56,13 @@ export function run(
     return connection.request(
       'workspace/executeCommand',
       {
-        command: 'dynotable.runStatement',
+        command: RUN,
         arguments: [{uri: document.uri, ...(rowCap === undefined ? {} : {rowCap})}]
       },
       runResultSchema
     );
   };
 }
-
-const RUN = 'dynotable.runStatement';
 
 /**
  * The first Run lens whose statement holds `row` (0-based). The statement range is in the lens's

@@ -1,8 +1,6 @@
-import type {RunResult} from '../../src/protocol';
 import {visible} from './display';
 import {EXIT, type Sink} from './io';
 import {messageOf, type ErrorCode} from './messages';
-import {renderTable, type TableOptions} from './table';
 
 export interface Failure {
   code: ErrorCode;
@@ -55,12 +53,3 @@ export function printText(io: Sink, failure: Failure): void {
   io.err(`${visible(textOf(failure))}\n`);
   io.exit(exitOf(failure.code));
 }
-
-/** `run --zed`: the rows as a table for a person in Zed's terminal panel, a failure as plain text. */
-export const tablePrinter =
-  (options: TableOptions): Printer =>
-  (io, {value, failure}) => {
-    if (value !== undefined) io.out(renderTable(value as RunResult, options));
-    if (failure) printText(io, failure);
-    else io.exit(EXIT.ok);
-  };
