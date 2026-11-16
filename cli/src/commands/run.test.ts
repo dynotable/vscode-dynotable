@@ -6,7 +6,7 @@ import {describe, expect, it} from 'vitest';
 import {REQUEST_FAILED, type Range} from '../../../src/protocol';
 import {RpcFailure} from '../../../src/rpc';
 import type {Input} from '../args';
-import {printText} from '../output';
+import {tablePrinter} from '../output';
 import {useHarness} from '../test-session';
 import {readDocument, run, runAtRow} from './run';
 
@@ -139,7 +139,10 @@ describe('runAtRow', () => {
       Readable.from([])
     );
     if (!('document' in read)) throw new Error(`no document: ${JSON.stringify(read)}`);
-    await h.run(runAtRow(read.document, row), {agent: false, print: printText});
+    await h.run(runAtRow(read.document, row), {
+      agent: false,
+      print: tablePrinter({width: 120, color: false})
+    });
   }
 
   it('runs the statement whose second line holds the row, with its argument unchanged', async () => {
@@ -198,6 +201,14 @@ describe('runAtRow', () => {
     await runAt(0, null);
     expect(h.stderr).toBe(NO_STATEMENT(1));
     expect(h.codes).toEqual([1]);
+  });
+
+  // With no range, the app runs the whole document: run --zed must never do that.
+  it('a Run lens whose argument has no range is not run', async () => {
+    const whole = lens(span(0, 0, 10));
+    await runAt(0, [{...whole, command: {...whole.command, arguments: [{uri: uri()}]}}]);
+    expect(h.stderr).toBe(NO_STATEMENT(1));
+    expect(message('workspace/executeCommand')).toBeUndefined();
   });
 
   it('an Open in DynoTable lens is not run', async () => {

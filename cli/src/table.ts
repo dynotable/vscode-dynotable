@@ -3,6 +3,14 @@ import type {RunResult} from '../../src/protocol';
 import {summary} from '../../src/results-model';
 import {visible} from './display';
 
+/** The table options for a stdout: colour only on a terminal, and not when `NO_COLOR` is set. */
+export function tableOptions(
+  stdout: {columns?: number; isTTY?: boolean},
+  env: Readonly<Record<string, string | undefined>>
+): TableOptions {
+  return {width: stdout.columns || 120, color: stdout.isTTY === true && !env.NO_COLOR};
+}
+
 export interface TableOptions {
   /** The terminal's width in characters. */
   width: number;

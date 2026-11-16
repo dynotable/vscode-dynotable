@@ -52,6 +52,9 @@ shows: exit codes, signals, and the name that the binary was started under (`dyn
   - `cli/src/`: the arguments, the session, and the subcommands and the stdio bridge
     (`commands/`). `cli/src/main.ts` binds the real process. The subcommands get it through
     `cli/src/io.ts` and do not touch `process`.
+  - `cli/src/table.ts`: the terminal table of `dynotable-lsp run --zed`. It imports
+    `src/grid-model.ts` and `src/results-model.ts`, so keep both free of `vscode` imports.
+  - `cli/src/display.ts`: makes control characters visible in terminal text.
   - `cli/scripts/build.mjs`: the Bun build.
   - `cli/test-binary/`: the compiled-binary tests (`pnpm cli:binary`).
   - `cli/npm/`: the npm wrapper `dynotable-cli` (bins `dynotable-cli` and `dynotable-lsp`) and the

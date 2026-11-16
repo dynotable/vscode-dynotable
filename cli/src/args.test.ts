@@ -110,8 +110,7 @@ describe('dynotable-lsp run --zed', () => {
       agent: false,
       launch: true,
       file: "/w/it's a file.dtsql",
-      row: 2,
-      line: 3
+      row: 2
     });
   });
 

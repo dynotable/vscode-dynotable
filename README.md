@@ -360,6 +360,10 @@ is not running. Give it to editors only, never to an agent.
 task uses it. It reads the file from `ZED_FILE` and the line from `ZED_ROW`, and runs the statement
 on that line. It takes no flag. It uses the `profile` of `.dynotable.json` in the current directory,
 else the only profile. Its output is plain text, not JSON. It also opens an editor session.
+On failure, stderr holds one plain sentence. Exit 0 on success, 1 on a failure, 2 on a bad command
+line, a bad `ZED_FILE` or a bad `.dynotable.json`, and 130 on Ctrl+C. On a terminal, the table has a
+bold header and dim borders. Set `NO_COLOR` to turn colour off. Wide characters, for example CJK,
+can misalign the table.
 
 Zed and Sublime Text have their own clients. Each one uses `dynotable-lsp` from your `PATH`, or
 installs `dynotable-cli` from npm. Both clients run statements: Sublime Text shows the rows in a

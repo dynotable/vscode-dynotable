@@ -18,3 +18,7 @@
 - The Run task of `dynotable/zed-dynotable` (`languages/*/tasks.json`) runs `dynotable-lsp --version`
   and matches the bare version, then `dynotable-lsp run --zed`, which reads `ZED_FILE` and
   `ZED_ROW`. A change to that output or interface needs the same change there.
+- `dynotable/LSP-dynotable` (`dynotable_results.py`) ports by hand the cell text, numeric column,
+  summary, CSV guard, JSON copy and Markdown copy rules of `src/grid-model.ts` and
+  `src/results-model.ts`. A change to those rules needs the same change, with literal tests, in
+  that port.

@@ -269,6 +269,13 @@ describe('dynotable-lsp run --zed', () => {
     await until(() => fake.sessions.size === 0, 'the session to close');
   });
 
+  it('run without --zed prints one plain sentence and exits 2', async () => {
+    const run = start(['run'], {argv0: 'dynotable-lsp'});
+    expect(await within(run.ended, END_MS)).toEqual({code: 2, signal: null});
+    expect(run.stderr()).toBe('dynotable-lsp run needs --zed.\n');
+    expect(fake.initializeParams).toEqual([]);
+  });
+
   it('a ZED_FILE that is not a DynamoDB file name exits 2 before it connects', async () => {
     const notes = join(home, 'notes.txt');
     writeFileSync(notes, 'SELECT * FROM "orders"');

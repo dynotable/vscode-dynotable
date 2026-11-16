@@ -30,7 +30,7 @@ export type Command = CommandBase &
     | {command: 'profiles' | 'tables' | 'indices'}
     | {command: 'run'; input: Input; rowCap?: number}
     // `dynotable-lsp run --zed`: the statement at one line of ZED_FILE, in an editor session.
-    | {command: 'zed-run'; file: string; row: number; line: number}
+    | {command: 'zed-run'; file: string; row: number}
   );
 
 export type Invocation =
@@ -81,7 +81,7 @@ export function programName(argv0: string): string {
 
 /**
  * Parses the command line. `argv0` is the name the binary was started under; `args` are the
- * arguments after it; `env` gives `run --zed` its file and line.
+ * arguments after it; `env` gives `run --zed` its file and row.
  */
 export function parse(
   argv0: string,
@@ -179,15 +179,13 @@ function zedRun(
   if (row === undefined || !/^[1-9]\d*$/.test(row)) {
     return usage('ZED_ROW must be a line number of 1 or more.');
   }
-  const line = Number(row);
   return {
     kind: 'command',
     command: 'zed-run',
     agent: false,
     launch: true,
     file,
-    row: line - 1,
-    line
+    row: Number(row) - 1
   };
 }
 
