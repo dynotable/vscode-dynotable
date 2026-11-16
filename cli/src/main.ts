@@ -31,7 +31,7 @@ process.on('SIGINT', () => {
 // The editor or the reader of the output is gone: end as when stdin closes.
 process.stdout.on('error', () => io.stdin.destroy());
 
-const invocation = parse(process.argv0, process.argv.slice(2));
+const invocation = parse(process.argv0, process.argv.slice(2), process.env);
 switch (invocation.kind) {
   case 'help':
     io.out(HELP);
@@ -68,6 +68,10 @@ async function start(given: Command): Promise<void> {
     await bridge.run();
     return;
   }
+  if (given.command === 'zed-run') {
+    emit(io, {failure: {code: 'usage', detail: 'run --zed is not available in this build.'}});
+    return;
+  }
   const work = await workOf(given);
   // A bad input, or a SIGINT during the stdin read, ended the command.
   if (!work || io.finished) return;
@@ -78,7 +82,7 @@ async function start(given: Command): Promise<void> {
   await oneShot.run(work);
 }
 
-async function workOf(given: Exclude<Command, {command: 'lsp'}>) {
+async function workOf(given: Exclude<Command, {command: 'lsp' | 'zed-run'}>) {
   switch (given.command) {
     case 'profiles':
     case 'tables':
