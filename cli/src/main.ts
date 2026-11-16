@@ -1,12 +1,14 @@
 import {homedir} from 'node:os';
 import path from 'node:path';
+import type {RunResult} from '../../src/protocol';
 import {EDITOR_BRIDGE_NAME, HELP, parse, programName, type Command} from './args';
 import {createBridge} from './commands/lsp-bridge';
 import {list} from './commands/listing';
 import {readDocument, run, runAtRow} from './commands/run';
 import {EXIT, sink} from './io';
-import {emit, printText} from './output';
+import {emit, printText, type Printer} from './output';
 import {createSession, type CliSession} from './session';
+import {renderTable} from './table';
 import {CLI_VERSION, minAppVersion} from './version';
 
 const io = sink({
@@ -18,9 +20,22 @@ const io = sink({
   }
 });
 
+/** `run --zed`: the rows as a table for a person in Zed's terminal panel. */
+const printTable: Printer = (out, {value, failure}) => {
+  if (value !== undefined) {
+    out.out(
+      renderTable(value as RunResult, {
+        width: process.stdout.columns || 120,
+        color: process.stdout.isTTY === true && !process.env.NO_COLOR
+      })
+    );
+  }
+  printText(out, failure ? {failure} : {});
+};
+
 const invocation = parse(process.argv0, process.argv.slice(2), process.env);
 // `run --zed` prints for a person in Zed's terminal. The bridge keeps JSON on stderr.
-const print = invocation.kind === 'command' && invocation.command === 'zed-run' ? printText : emit;
+const print = invocation.kind === 'command' && invocation.command === 'zed-run' ? printTable : emit;
 
 let session: Pick<CliSession, 'stop'> | undefined;
 let interrupted = false;
@@ -84,7 +99,7 @@ async function start(given: Command): Promise<void> {
       return;
     }
     if (io.finished) return;
-    const editor = createSession({...common, agent: false, print: printText});
+    const editor = createSession({...common, agent: false, print: printTable});
     session = editor;
     await editor.run(runAtRow(read.document, given.row));
     return;
