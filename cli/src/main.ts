@@ -5,9 +5,9 @@ import {createBridge} from './commands/lsp-bridge';
 import {list} from './commands/listing';
 import {readDocument, run, runAtRow} from './commands/run';
 import {EXIT, sink} from './io';
-import {emit, printText, tablePrinter} from './output';
+import {emit, printText} from './output';
 import {createSession, type CliSession} from './session';
-import {tableOptions} from './table';
+import {tableOptions, tablePrinter} from './table';
 import {CLI_VERSION, minAppVersion} from './version';
 
 const io = sink({
@@ -81,7 +81,7 @@ async function start(given: Command): Promise<void> {
   if (given.command === 'zed-run') {
     const read = await readDocument(
       {kind: 'file', path: given.file},
-      {cwd: process.cwd(), path},
+      {cwd: common.cwd, path},
       io.stdin
     );
     if (!('document' in read)) {
@@ -94,7 +94,7 @@ async function start(given: Command): Promise<void> {
     await editor.run(runAtRow(read.document, given.row));
     return;
   }
-  const work = await workOf(given);
+  const work = await workOf(given, common.cwd);
   // A bad input, or a SIGINT during the stdin read, ended the command.
   if (!work || io.finished) return;
   // A listing of profiles needs no profile, so a broken .dynotable.json must not stop it.
@@ -107,16 +107,16 @@ async function start(given: Command): Promise<void> {
   await oneShot.run(work);
 }
 
-async function workOf(given: Exclude<Command, {command: 'lsp' | 'zed-run'}>) {
+async function workOf(given: Exclude<Command, {command: 'lsp' | 'zed-run'}>, cwd: string) {
   switch (given.command) {
     case 'profiles':
     case 'tables':
     case 'indices':
       return list(given.command);
     case 'run': {
-      const read = await readDocument(given.input, {cwd: process.cwd(), path}, io.stdin);
+      const read = await readDocument(given.input, {cwd, path}, io.stdin);
       if ('document' in read) return run(read.document, given.rowCap);
-      emit(io, read);
+      print(io, read);
       return undefined;
     }
   }
